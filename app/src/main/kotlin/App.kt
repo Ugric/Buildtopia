@@ -79,11 +79,6 @@ fun createShader(vertexSrc: String, fragmentSrc: String): Int {
     return program
 }
 
-fun rotateMatrix(angleDeg: Float, axis: Vector3f, dest: Matrix4f = Matrix4f()): Matrix4f {
-    val radians = Math.toRadians(angleDeg.toDouble()).toFloat()
-    return dest.identity().rotate(radians, axis)
-}
-
 fun getCameraMatrix(position: Vector3d, pitch: Double, yaw: Double, roll: Double): Matrix4d {
     val view = Matrix4d()
     view.identity().rotateX(-pitch)  // pitch = X
@@ -262,8 +257,8 @@ fun main() {
     val vertices_size = vertices.size;
     vertices.clear()
 
-    var lastX = width / 2.0
-    var lastY = height / 2.0
+    var lastX: Double? = null
+    var lastY: Double? = null
 
     val sensitivity = 5f
 
@@ -283,8 +278,8 @@ fun main() {
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
                 // Optionally recenter the cursor
                 glfwSetCursorPos(window, width / 2.0, height / 2.0)
-                lastX = width / 2.0
-                lastY = height / 2.0
+                lastX = null
+                lastY = null
             } else {
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
             }
@@ -292,9 +287,9 @@ fun main() {
     }
 
     glfwSetCursorPosCallback(window) { window, xpos, ypos ->
-        if (cursorDisabled) {
-            val dx = (xpos - lastX) / width
-            val dy = (ypos - lastY) / height
+        if (cursorDisabled && lastX!=null&&lastY!=null) {
+            val dx = (xpos - lastX!!) / width
+            val dy = (ypos - lastY!!) / height
             yaw -= dx * sensitivity
             pitch -= dy * sensitivity
             pitch = pitch.coerceIn(-PI/2,PI/2)
@@ -302,6 +297,8 @@ fun main() {
         lastX = xpos
         lastY = ypos
     }
+
+    val velocity = Vector3d(0.0,0.0,0.0)
 
     while (!glfwWindowShouldClose(window)) {
 
