@@ -2,18 +2,55 @@ plugins {
     // Apply the shared build logic from a convention plugin.
     // The shared code is located in `buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts`.
     id("buildsrc.convention.kotlin-jvm")
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 
     // Apply the Application plugin to add support for building an executable JVM application.
     application
 }
+val lwjglVersion = "3.3.6"
 
 dependencies {
-    // Project "app" depends on project "utils". (Project paths are separated with ":", so ":utils" refers to the top-level "utils" project.)
     implementation(project(":utils"))
+
+    implementation("org.joml:joml:1.10.5")
+
+    // Core LWJGL modules
+    implementation("org.lwjgl:lwjgl:$lwjglVersion")
+    implementation("org.lwjgl:lwjgl-opengl:$lwjglVersion")
+    implementation("org.lwjgl:lwjgl-glfw:$lwjglVersion")
+    implementation("org.lwjgl:lwjgl-stb:$lwjglVersion")
+
+    // Natives for all platforms
+    runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:natives-linux")
+    runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:natives-windows")
+    runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:natives-macos")
+
+    runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-linux")
+    runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-windows")
+    runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-macos")
+
+    runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-linux")
+    runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-windows")
+    runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-macos")
+
+    runtimeOnly("org.lwjgl:lwjgl-stb:$lwjglVersion:natives-linux")
+    runtimeOnly("org.lwjgl:lwjgl-stb:$lwjglVersion:natives-windows")
+    runtimeOnly("org.lwjgl:lwjgl-stb:$lwjglVersion:natives-macos")
 }
 
 application {
-    // Define the Fully Qualified Name for the application main class
-    // (Note that Kotlin compiles `App.kt` to a class with FQN `com.example.app.AppKt`.)
-    mainClass = "dev.wbell.buildtopia.app.AppKt"
+    // Fully Qualified Name of your main function's class
+    mainClass.set("dev.wbell.buildtopia.app.AppKt")
+}
+
+
+tasks {
+    shadowJar {
+        archiveBaseName.set("app")
+        archiveClassifier.set("")   // so it produces app.jar, not app-all.jar
+        archiveVersion.set("")      // omit version in filename
+        manifest {
+            attributes["Main-Class"] = "dev.wbell.buildtopia.app.AppKt"
+        }
+    }
 }
