@@ -14,6 +14,8 @@ dependencies {
 
     implementation("org.joml:joml:1.10.5")
 
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+
     // Core LWJGL modules
     implementation("org.lwjgl:lwjgl:$lwjglVersion")
     implementation("org.lwjgl:lwjgl-opengl:$lwjglVersion")

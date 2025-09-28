@@ -1,58 +1,12 @@
 package dev.wbell.buildtopia.app
 
+import dev.wbell.buildtopia.app.game.Game
 import org.joml.Matrix4d
 import org.joml.Matrix4f
 import org.joml.Vector3d
-import org.joml.Vector3f
-import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW.*
-import org.lwjgl.opengl.ARBVertexArrayObject.glBindVertexArray
-import org.lwjgl.opengl.ARBVertexArrayObject.glGenVertexArrays
-import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL20.*
-import org.lwjgl.system.MemoryUtil.NULL
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-import org.lwjgl.stb.STBImage
-import java.nio.ByteBuffer
-import java.nio.IntBuffer
-
-fun loadTexture(path: String): Int {
-    val textureId = glGenTextures()
-    glBindTexture(GL_TEXTURE_2D, textureId)
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-
-    // Load image from resources
-    val stream = object {}.javaClass.getResourceAsStream(path)
-        ?: throw RuntimeException("Failed to load texture: $path")
-
-    // Read stream into a ByteBuffer
-    val bytes = stream.readBytes()
-    val buffer = BufferUtils.createByteBuffer(bytes.size)
-    buffer.put(bytes)
-    buffer.flip()
-
-    val widthBuffer: IntBuffer = BufferUtils.createIntBuffer(1)
-    val heightBuffer: IntBuffer = BufferUtils.createIntBuffer(1)
-    val channelsBuffer: IntBuffer = BufferUtils.createIntBuffer(1)
-
-    val image = STBImage.stbi_load_from_memory(buffer, widthBuffer, heightBuffer, channelsBuffer, 4)
-        ?: throw RuntimeException("Failed to load texture: ${STBImage.stbi_failure_reason()}")
-
-    val width = widthBuffer.get(0)
-    val height = heightBuffer.get(0)
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image)
-    STBImage.stbi_image_free(image)
-
-    return textureId
-}
 
 fun loadResource(path: String): String {
     return object {}.javaClass.getResource(path)?.readText() ?: throw RuntimeException("Resource not found: $path")
@@ -105,278 +59,140 @@ fun updateProjection(shaderProgram: Int, width: Int, height: Int) {
     glUniformMatrix4fv(projLoc, false, projBuffer)
 }
 
-// @formatter:off
-fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, cubeScale: Float, face: String) {
-    val half = cubeScale / 2f
-    when(face) {
-        "front" -> vertices.addAll(listOf(
-            x - half, y - half, z + half, 0f, 0f,   // bottom-left
-            x + half, y - half, z + half, 1f, 0f,   // bottom-right
-            x + half, y + half, z + half, 1f, 1f,   // top-right
-
-            x + half, y + half, z + half, 1f, 1f,   // top-right
-            x - half, y + half, z + half, 0f, 1f,   // top-left
-            x - half, y - half, z + half, 0f, 0f    // bottom-left
-        ))
-        "back" -> vertices.addAll(listOf(
-            x - half, y - half, z - half, 0f, 0f,
-            x + half, y - half, z - half, 1f, 0f,
-            x + half, y + half, z - half, 1f, 1f,
-
-            x + half, y + half, z - half, 1f, 1f,
-            x - half, y + half, z - half, 0f, 1f,
-            x - half, y - half, z - half, 0f, 0f
-        ))
-        "left" -> vertices.addAll(listOf(
-            x - half, y - half, z - half, 0f, 0f,
-            x - half, y - half, z + half, 1f, 0f,
-            x - half, y + half, z + half, 1f, 1f,
-
-            x - half, y + half, z + half, 1f, 1f,
-            x - half, y + half, z - half, 0f, 1f,
-            x - half, y - half, z - half, 0f, 0f
-        ))
-        "right" -> vertices.addAll(listOf(
-            x + half, y - half, z - half, 0f, 0f,
-            x + half, y - half, z + half, 1f, 0f,
-            x + half, y + half, z + half, 1f, 1f,
-
-            x + half, y + half, z + half, 1f, 1f,
-            x + half, y + half, z - half, 0f, 1f,
-            x + half, y - half, z - half, 0f, 0f
-        ))
-        "top" -> vertices.addAll(listOf(
-            x - half, y + half, z - half, 0f, 0f,
-            x - half, y + half, z + half, 0f, 1f,
-            x + half, y + half, z + half, 1f, 1f,
-
-            x + half, y + half, z + half, 1f, 1f,
-            x + half, y + half, z - half, 1f, 0f,
-            x - half, y + half, z - half, 0f, 0f
-        ))
-        "bottom" -> vertices.addAll(listOf(
-            x - half, y - half, z - half, 0f, 0f,
-            x - half, y - half, z + half, 0f, 1f,
-            x + half, y - half, z + half, 1f, 1f,
-
-            x + half, y - half, z + half, 1f, 1f,
-            x + half, y - half, z - half, 1f, 0f,
-            x - half, y - half, z - half, 0f, 0f
-        ))
-    }
-}
-// @formatter:on
-
 fun main() {
-    // Initialize GLFW
-    if (!glfwInit()) throw RuntimeException("Failed to initialize GLFW")
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
 
-    var width = 854
-    var height = 480
-    val window = glfwCreateWindow(width, height, "Blocktopia", NULL, NULL)
-    if (window == NULL) throw RuntimeException("Failed to create GLFW window")
-
-    glfwMakeContextCurrent(window)
-    GL.createCapabilities()
-    glEnable(GL_DEPTH_TEST)
-
-    // Simple shaders
-    val vertexShaderSrc = loadResource("/shaders/vertex.glsl")
-
-    val fragmentShaderSrc = loadResource("/shaders/fragment.glsl")
-
-    val shaderProgram = createShader(vertexShaderSrc, fragmentShaderSrc)
-    glUseProgram(shaderProgram)
-
-    val modelLoc = glGetUniformLocation(shaderProgram, "model")
-    val viewLoc = glGetUniformLocation(shaderProgram, "view")
-    val projLoc = glGetUniformLocation(shaderProgram, "projection")
-
-    // Initial projection
-
-    // GLFW callback for resizing
-    glfwSetFramebufferSizeCallback(window) { _, w, h ->
-        width = w
-        height = h
-        updateProjection(shaderProgram, w, h)
-    }
-
-    updateProjection(shaderProgram, width, height)
 
     // Camera parameters
-
-    var surfaceLevel = 64
-    val xSize = 16;
-    val ySize = 384;
-    val yOffset = 65;
-    val zSize = 16;
-    val cameraPos = Vector3d(0.0, surfaceLevel+2.0, 0.0)
-    var pitch = 0.0
-    var yaw = 0.0
-    var roll = 0.0
     var startTime = glfwGetTime()
     var lastTime = startTime
+//
+//
+//
+//    var lastX: Double? = null
+//    var lastY: Double? = null
+//
+//    val sensitivity = 5f
+//
+//    var cursorDisabled = true
+//
+//    var textureId = loadTexture("/resource_pack/textures/block/cobblestone.png")
 
 
-    val vertices = mutableListOf<Float>()
-    for (y in -yOffset..ySize-yOffset) {
-        for (x in -xSize/2..xSize/2) {
-            for (z in -zSize/2..zSize/2) {
-                if (y > surfaceLevel) continue;
-                // Only draw "outer" faces
-                if (x == -xSize/2) addFace(vertices, x, y, z, 1f, "left")
-                if (x == xSize/2) addFace(vertices, x, y, z, 1f, "right")
-                if (z == -zSize/2) addFace(vertices, x, y, z, 1f, "back")
-                if (z == zSize/2) addFace(vertices, x, y, z, 1f, "front")
+    Game.init()
 
-                // Always draw top and bottom
-                if (y == surfaceLevel) addFace(vertices, x, y, z, 1f, "top")
-                if (y == -yOffset) addFace(vertices, x, y, z, 1f, "bottom")
-            }
+    Game.window?.let {
+        window->
+        while (!glfwWindowShouldClose(window)) {
+            val currentTime = glfwGetTime()
+            val deltaTime = currentTime - lastTime // in seconds
+            lastTime = currentTime
+            Game.render(deltaTime)
+//        isOnGround = cameraPos.y <= surfaceLevel + 2
+//        //yaw += 0.5f
+//        //cameraPos.y += 0.25f*deltaTime
+//        // Forward vector (direction camera is looking in XZ plane)
+//        val forwardX = sin(yaw)
+//        val forwardZ = cos(yaw)
+//
+//// Right vector (perpendicular to forward)
+//        val rightX = -cos(yaw)
+//        val rightZ = sin(yaw)
+//        val ticksPerSecond = 20.0
+//        val slipperiness = if (isOnGround) 0.6 else 1.0
+//        val baseAccelerationPerTick = 0.1
+//        val sprintMultiplier = if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) 1.3 else 1.0
+//        val acceleration = (baseAccelerationPerTick * sprintMultiplier*(0.6/slipperiness).pow(3))*2.5
+//
+//// Apply friction
+//        val frictionPerTick = 0.91 * slipperiness      // combined tick friction + slipperiness
+//        val friction = frictionPerTick.pow(ticksPerSecond * deltaTime)
+//
+//        velocity.x *= friction
+//        velocity.z *= friction
+//
+//// --- Horizontal movement ---
+//        var moveX = 0.0
+//        var moveZ = 0.0
+//        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveZ -= 1.0
+//        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveZ += 1.0
+//        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveX += 1.0
+//        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveX -= 1.0
+//
+//        val lengthSquared = moveX * moveX + moveZ * moveZ
+//        if (lengthSquared > 0) {
+//            val len = sqrt(lengthSquared)
+//            moveX /= len
+//            moveZ /= len
+//            velocity.x += (forwardX * moveZ + rightX * moveX) * acceleration * deltaTime
+//            velocity.z += (forwardZ * moveZ + rightZ * moveX) * acceleration * deltaTime
+//        }
+//
+//        // Apply Gravity
+//        // Gravity in blocks/s²
+//        if (!isOnGround) {
+//            if (!isFlying) {
+//                val gravityPerSecond = 0.08
+//                velocity.y -= gravityPerSecond * deltaTime
+//            }
+//        } else if (velocity.y<0) {
+//            if (isFlying) isFlying = false
+//            velocity.y = 0.0
+//            cameraPos.y = surfaceLevel + 2.0
+//        }
+//        isOnGround = (cameraPos.y+velocity.y) <= surfaceLevel + 2
+//
+//// --- Vertical movement (flying) ---
+//        if (isFlying) {
+//            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+//                velocity.y += acceleration * deltaTime
+//            }
+//            if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+//                velocity.y -= acceleration * deltaTime
+//            }
+//        } else if (isOnGround) {
+//            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+//                velocity.y = 0.42/15
+//            }
+//        } else {
+//            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+//                //isFlying = true
+//            }
+//        }
+//        velocity.y *= (1-(0.2*deltaTime))
+//
+//// Update position
+//        cameraPos.add(velocity)
+//        //yaw += 0.1f*deltaTime
+//        glEnable(GL_DEPTH_TEST)
+//        glClearColor(0.2f, 1f, 1f, 1f)
+//        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+//
+//        // Update camera
+//        val view = getCameraMatrix(cameraPos, pitch, yaw, roll)
+//        val viewBuffer = FloatArray(16)
+//        view.get(viewBuffer)
+//        glUniformMatrix4fv(viewLoc, false, viewBuffer)
+//
+//        // Draw the grid
+//        val vertexCount = vertices_size / 5
+//
+//        // Normal cube
+//        glBindTexture(GL_TEXTURE_2D, textureId)
+//        glUniform1i(glGetUniformLocation(shaderProgram, "texture1"), 0)
+//        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+//        val model = Matrix4f().identity()  // adjust position/scale if needed
+//        val modelBuffer = FloatArray(16)
+//        model.get(modelBuffer)
+//        glUniformMatrix4fv(modelLoc, false, modelBuffer)
+//
+//        glBindVertexArray(vao)
+//        glDrawArrays(GL_TRIANGLES, 0, vertexCount)
+//        glBindVertexArray(0)
+//
+//
+//        glfwSwapBuffers(window)
+//        glfwPollEvents()
         }
     }
-// Upload to VBO/VAO
-    val vao = glGenVertexArrays()
-    val vbo = glGenBuffers()
-    glBindVertexArray(vao)
-    glBindBuffer(GL_ARRAY_BUFFER, vbo)
-    glBufferData(GL_ARRAY_BUFFER, vertices.toFloatArray(), GL_STATIC_DRAW)
-
-    val stride = 5 * 4 // 5 floats * 4 bytes
-    glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0)       // position
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 3 * 4)   // tex coords
-    glEnableVertexAttribArray(1)
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
-    glBindVertexArray(0)
-
-    val vertices_size = vertices.size;
-    vertices.clear()
-
-    var lastX: Double? = null
-    var lastY: Double? = null
-
-    val sensitivity = 5f
-
-    var default_speed = 5f
-
-    var cursorDisabled = true
-
-    var textureId = loadTexture("/textures/default_grass.png")
-
-// Initially disable the cursor
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
-
-    glfwSetKeyCallback(window) { window, key, scancode, action, mods ->
-        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-            cursorDisabled = !cursorDisabled
-            if (cursorDisabled) {
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
-                // Optionally recenter the cursor
-                glfwSetCursorPos(window, width / 2.0, height / 2.0)
-                lastX = null
-                lastY = null
-            } else {
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
-            }
-        }
-    }
-
-    glfwSetCursorPosCallback(window) { window, xpos, ypos ->
-        if (cursorDisabled && lastX!=null&&lastY!=null) {
-            val dx = (xpos - lastX!!) / width
-            val dy = (ypos - lastY!!) / height
-            yaw -= dx * sensitivity
-            pitch -= dy * sensitivity
-            pitch = pitch.coerceIn(-PI/2,PI/2)
-        }
-        lastX = xpos
-        lastY = ypos
-    }
-
-    val velocity = Vector3d(0.0,0.0,0.0)
-
-    while (!glfwWindowShouldClose(window)) {
-
-        val currentTime = glfwGetTime()
-        val deltaTime = (currentTime - lastTime).toFloat() // in seconds
-        lastTime = currentTime
-
-        //yaw += 0.5f
-        //cameraPos.y += 0.25f*deltaTime
-        // Forward vector (direction camera is looking in XZ plane)
-        val forwardX = sin(yaw)
-        val forwardZ = cos(yaw)
-
-// Right vector (perpendicular to forward)
-        val rightX = -cos(yaw)
-        val rightZ = sin(yaw)
-        var speed = 5f
-        if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
-            speed *=2
-        }
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            cameraPos.x -= (forwardX * speed * deltaTime).toFloat()
-            cameraPos.z -= (forwardZ * speed * deltaTime).toFloat()
-        }
-        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-            cameraPos.y -= speed*deltaTime
-        }
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            cameraPos.y += speed*deltaTime
-        }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            cameraPos.x += (forwardX * speed * deltaTime).toFloat()
-            cameraPos.z += (forwardZ * speed * deltaTime).toFloat()
-        }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            cameraPos.x += (rightX * speed * deltaTime).toFloat()
-            cameraPos.z += (rightZ * speed * deltaTime).toFloat()
-        }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            cameraPos.x -= (rightX * speed * deltaTime).toFloat()
-            cameraPos.z -= (rightZ * speed * deltaTime).toFloat()
-        }
-        //yaw += 0.1f*deltaTime
-        glEnable(GL_DEPTH_TEST)
-        glClearColor(0.2f, 1f, 1f, 1f)
-        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-        // Update camera
-        val view = getCameraMatrix(cameraPos, pitch, yaw, roll)
-        val viewBuffer = FloatArray(16)
-        view.get(viewBuffer)
-        glUniformMatrix4fv(viewLoc, false, viewBuffer)
-
-        // Draw the grid
-        val vertexCount = vertices_size / 5
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-        glBindVertexArray(vao)
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount)
-        glBindVertexArray(0)
-
-        // Normal cube
-        glBindTexture(GL_TEXTURE_2D, textureId)
-        glUniform1i(glGetUniformLocation(shaderProgram, "texture1"), 0)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-        val model = Matrix4f().identity()  // adjust position/scale if needed
-        val modelBuffer = FloatArray(16)
-        model.get(modelBuffer)
-        glUniformMatrix4fv(modelLoc, false, modelBuffer)
-
-        glBindVertexArray(vao)
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount)
-        glBindVertexArray(0)
-
-
-        glfwSwapBuffers(window)
-        glfwPollEvents()
-    }
-
-    glfwDestroyWindow(window)
-    glfwTerminate()
+    Game.close()
 }
