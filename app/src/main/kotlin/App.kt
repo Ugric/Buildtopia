@@ -33,12 +33,11 @@ fun createShader(vertexSrc: String, fragmentSrc: String): Int {
     return program
 }
 
-fun getCameraMatrix(position: Vector3d, pitch: Double, yaw: Double, roll: Double): Matrix4d {
-    val view = Matrix4d()
+fun getCameraRotationMatrix(pitch: Float, yaw: Float, roll: Float): Matrix4f {
+    val view = Matrix4f()
     view.identity().rotateX(-pitch)  // pitch = X
         .rotateY(-yaw)    // yaw   = Y
-        .rotateZ(-roll)   // roll  = Z
-        .translate(-position.x, -position.y, -position.z)      // move world opposite to camera
+        .rotateZ(-roll)      // move world opposite to camera
     return view
 }
 

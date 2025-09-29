@@ -4,14 +4,32 @@ import dev.wbell.buildtopia.app.game.Game
 import dev.wbell.buildtopia.app.game.camera.Camera
 import dev.wbell.buildtopia.app.game.session.world.World
 import org.joml.Vector2d
+import org.joml.Vector2f
 import org.joml.Vector3d
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFW.glfwGetKey
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sin
 
-class Player(val position: Vector3d, var pitch: Double, var yaw: Double) {
+
+data class AABB(
+    var minX: Double, var minY: Double, var minZ: Double,
+    var maxX: Double, var maxY: Double, var maxZ: Double
+) {
+    fun offset(dx: Double, dy: Double, dz: Double) =
+        AABB(minX + dx, minY + dy, minZ + dz, maxX + dx, maxY + dy, maxZ + dz)
+
+    fun intersects(other: AABB): Boolean =
+        maxX > other.minX && minX < other.maxX &&
+                maxY > other.minY && minY < other.maxY &&
+                maxZ > other.minZ && minZ < other.maxZ
+}
+
+class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
     var world: World? = null
     val velocity = Vector3d(0.0, 0.0, 0.0)
 
@@ -20,34 +38,63 @@ class Player(val position: Vector3d, var pitch: Double, var yaw: Double) {
     // Store last and current positions for interpolation
     private val lastPosition = Vector3d(position)
 
+
+    val width = 0.6
+    val height = 1.8
+    fun getBoundingBox(): AABB {
+        return AABB(
+            position.x-width/2, position.y,
+            position.z-width/2, position.x + width/2,
+            position.y + height, position.z + width/2
+        )
+    }
+
+    fun getNearbyBlockBoxes(bb: AABB): List<AABB> {
+        val boxes = mutableListOf<AABB>()
+
+        val minX = floor(bb.minX - 0.5).toInt()
+        val minY = floor(bb.minY).toInt()
+        val minZ = floor(bb.minZ - 0.5).toInt()
+        val maxX = floor(bb.maxX + 0.5).toInt()
+        val maxY = floor(bb.maxY).toInt()
+        val maxZ = floor(bb.maxZ + 0.5).toInt()
+
+        for (x in minX..maxX) {
+            for (y in minY..maxY) {
+                for (z in minZ..maxZ) {
+                    val block = world!!.blocks[x, y, z]
+                    if (block != null) {
+                        boxes.add(AABB(
+                            x - 0.5, y.toDouble(), z - 0.5,
+                            x + 0.5, y + 1.0, z + 0.5
+                        ))
+                    }
+                }
+            }
+        }
+
+        return boxes
+    }
+
     fun tick() {
         lastPosition.set(position)
-        val blockUnderneath = world!!.blocks[position.x.toInt(),position.y.toInt()-2,position.z.toInt()]
-            isOnGround = position.y + velocity.y <= 4
-
-        velocity.y -= 0.08
-        if (position.y + velocity.y <= 4) {
-            position.y = 4.0
-            velocity.y = 0.0
-        }
-        if (isOnGround&&glfwGetKey(Game.window!!, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            velocity.y = 0.42
-        }
+        println(position.y)
+        velocity.y = (velocity.y-0.08)*0.98
         val slipperiness = if (isOnGround) 0.6 else 1.0
-        val forward = Vector2d(-sin(yaw), -cos(yaw))
-        val left = Vector2d(-cos(yaw), sin(yaw))
-        val movement = Vector2d(0.0,0.0)
+        val forward = Vector2f(-sin(yaw), -cos(yaw))
+        val left = Vector2f(-cos(yaw), sin(yaw))
+        val movement = Vector2d(0.0, 0.0)
         if (glfwGetKey(Game.window!!, GLFW_KEY_W) == GLFW_PRESS) {
-            movement.x=1.0
+            movement.x = 1.0
         }
         if (glfwGetKey(Game.window!!, GLFW_KEY_S) == GLFW_PRESS) {
-            movement.x=-1.0
+            movement.x = -1.0
         }
         if (glfwGetKey(Game.window!!, GLFW_KEY_A) == GLFW_PRESS) {
-            movement.y=1.0
+            movement.y = 1.0
         }
         if (glfwGetKey(Game.window!!, GLFW_KEY_D) == GLFW_PRESS) {
-            movement.y=-1.0
+            movement.y = -1.0
         }
         if (movement.lengthSquared() != 0.0) {
             movement.normalize()
@@ -56,9 +103,75 @@ class Player(val position: Vector3d, var pitch: Double, var yaw: Double) {
         if (glfwGetKey(Game.window!!, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
             movement.mul(1.3)
         }
-        velocity.x = velocity.x*slipperiness*0.91+movement.x*(0.6/slipperiness).pow(3)*forward.x+movement.y*(0.6/slipperiness).pow(3)*left.x
-        velocity.z = velocity.z*slipperiness*0.91+movement.x*(0.6/slipperiness).pow(3)*forward.y+movement.y*(0.6/slipperiness).pow(3)*left.y
-        position.add(velocity)
+        velocity.x =
+            velocity.x * slipperiness * 0.91 + movement.x * (0.6 / slipperiness).pow(3) * forward.x + movement.y * (0.6 / slipperiness).pow(
+                3
+            ) * left.x
+        velocity.z =
+            velocity.z * slipperiness * 0.91 + movement.x * (0.6 / slipperiness).pow(3) * forward.y + movement.y * (0.6 / slipperiness).pow(
+                3
+            ) * left.y
+        if (isOnGround && glfwGetKey(Game.window!!, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            velocity.y = 0.42
+        }
+        moveAxis(velocity.x, 0.0, 0.0) // move along X
+        moveAxis(0.0, velocity.y, 0.0) // move along Y
+        moveAxis(0.0, 0.0, velocity.z) // move along Z
+        println(velocity)
+    }
+
+
+    private fun moveAxis(dx: Double, dy: Double, dz: Double) {
+        val steps = ceil(maxOf(abs(dx), abs(dy), abs(dz))).toInt().coerceAtLeast(1)
+        val stepX = dx / steps
+        val stepY = dy / steps
+        val stepZ = dz / steps
+
+        if (stepY != 0.0) isOnGround = false
+
+        repeat(steps) {
+            val bb = getBoundingBox().offset(stepX, stepY, stepZ)
+            val colliders = getNearbyBlockBoxes(bb)
+
+            var collidedX = false
+            var collidedY = false
+            var collidedZ = false
+
+            for (blockBB in colliders) {
+                if (bb.intersects(blockBB)) {
+                    // Y-axis collision
+                    if (stepY < 0.0) { // moving down
+                        position.y = blockBB.maxY
+                        velocity.y = 0.0
+                        collidedY = true
+                        isOnGround = true
+                    } else if (stepY > 0.0) { // moving up
+                        position.y = blockBB.minY - height
+                        velocity.y = 0.0
+                        collidedY = true
+                    }
+
+                    // X-axis collision
+                    if (stepX != 0.0) {
+                        position.x = if (stepX > 0) blockBB.minX - width/2 else blockBB.maxX + width/2
+                        velocity.x = 0.0
+                        collidedX = true
+                    }
+
+                    // Z-axis collision
+                    if (stepZ != 0.0) {
+                        position.z = if (stepZ > 0) blockBB.minZ - width/2 else blockBB.maxZ + width/2
+                        velocity.z = 0.0
+                        collidedZ = true
+                    }
+                }
+            }
+
+            // If no collision on a given axis, move normally
+            if (!collidedX) position.x += stepX
+            if (!collidedY) position.y += stepY
+            if (!collidedZ) position.z += stepZ
+        }
     }
 
     fun getCamera(alpha: Double): Camera {
@@ -67,7 +180,7 @@ class Player(val position: Vector3d, var pitch: Double, var yaw: Double) {
             lerp(lastPosition.y, position.y, alpha),
             lerp(lastPosition.z, position.z, alpha)
         )
-        return Camera(interpPos.add(0.0, 1.0, 0.0), pitch, yaw, 0.0)
+        return Camera(interpPos.add(0.0, 1.0, 0.0), pitch, yaw, 0f)
     }
 
     private fun lerp(a: Double, b: Double, t: Double): Double {

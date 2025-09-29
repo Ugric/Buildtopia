@@ -9,45 +9,12 @@ import dev.wbell.buildtopia.app.loadResource
 import dev.wbell.buildtopia.app.updateProjection
 import org.joml.Vector3d
 import org.lwjgl.BufferUtils
-import org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR
-import org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MINOR
-import org.lwjgl.glfw.GLFW.GLFW_CURSOR
-import org.lwjgl.glfw.GLFW.GLFW_CURSOR_DISABLED
-import org.lwjgl.glfw.GLFW.GLFW_CURSOR_NORMAL
-import org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE
-import org.lwjgl.glfw.GLFW.GLFW_OPENGL_CORE_PROFILE
-import org.lwjgl.glfw.GLFW.GLFW_OPENGL_PROFILE
-import org.lwjgl.glfw.GLFW.GLFW_PRESS
-import org.lwjgl.glfw.GLFW.glfwCreateWindow
-import org.lwjgl.glfw.GLFW.glfwDestroyWindow
-import org.lwjgl.glfw.GLFW.glfwInit
-import org.lwjgl.glfw.GLFW.glfwMakeContextCurrent
-import org.lwjgl.glfw.GLFW.glfwSetCursorPos
-import org.lwjgl.glfw.GLFW.glfwSetCursorPosCallback
-import org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback
-import org.lwjgl.glfw.GLFW.glfwSetInputMode
-import org.lwjgl.glfw.GLFW.glfwSetKeyCallback
-import org.lwjgl.glfw.GLFW.glfwTerminate
-import org.lwjgl.glfw.GLFW.glfwWindowHint
+import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL
-import org.lwjgl.opengl.GL11.GL_DEPTH_TEST
-import org.lwjgl.opengl.GL11.glEnable
 import org.lwjgl.opengl.GL20.glGetUniformLocation
 import org.lwjgl.opengl.GL20.glUseProgram
 import org.lwjgl.system.MemoryUtil.NULL
-import org.lwjgl.opengl.GL11.GL_NEAREST
-import org.lwjgl.opengl.GL11.GL_REPEAT
-import org.lwjgl.opengl.GL11.GL_RGBA
-import org.lwjgl.opengl.GL11.GL_TEXTURE_2D
-import org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER
-import org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER
-import org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_S
-import org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_T
-import org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE
-import org.lwjgl.opengl.GL11.glBindTexture
-import org.lwjgl.opengl.GL11.glGenTextures
-import org.lwjgl.opengl.GL11.glTexImage2D
-import org.lwjgl.opengl.GL11.glTexParameteri
+import org.lwjgl.opengl.GL13.*
 import org.lwjgl.stb.STBImage
 import java.nio.IntBuffer
 import kotlin.math.PI
@@ -111,17 +78,19 @@ object Game {
     fun init() {
         // Initialize GLFW
         if (!glfwInit()) throw RuntimeException("Failed to initialize GLFW")
+        glfwWindowHint(GLFW_SAMPLES, 4)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
         window = glfwCreateWindow(width, height, "Blocktopia", NULL, NULL)
         if (window == NULL) throw RuntimeException("Failed to create GLFW window")
-
+        glfwSwapInterval(1)
         window?.let { window ->
             glfwMakeContextCurrent(window)
             GL.createCapabilities()
+            glEnable(GL_MULTISAMPLE)
             glEnable(GL_DEPTH_TEST)
-            session.World = World(Player(Vector3d(0.0, 4.0, 0.0), 0.0,0.0), session)
+            session.World = World(Player(Vector3d(0.0, 100.0, 0.0), 0f,0f), session)
             session.World!!.player.world = session.World
 
             textureId = loadTexture("/resource_pack/textures/block/cobblestone.png")
@@ -171,10 +140,10 @@ object Game {
             if (cursorDisabled && Cursor.lastX != null && Cursor.lastY != null) {
                 val dx = (xpos - Cursor.lastX!!) / width
                 val dy = (ypos - Cursor.lastY!!) / height
-                session.World?.player?.yaw -= dx * 5f
-                session.World?.player?.pitch -= dy * 5f
+                session.World?.player?.yaw -= dx.toFloat() * 3.5f
+                session.World?.player?.pitch -= dy.toFloat() * 3.5f
                 session.World?.player?.pitch?.let {
-                    session.World?.player?.pitch = it.coerceIn(-PI / 2, PI / 2)
+                    session.World?.player?.pitch = it.coerceIn(-PI.toFloat() / 2, PI.toFloat() / 2)
                 }
             }
             Cursor.lastX = xpos

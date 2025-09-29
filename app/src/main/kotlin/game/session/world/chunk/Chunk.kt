@@ -13,6 +13,7 @@ import org.joml.Vector2d
 import org.joml.Vector2i
 import org.joml.Vector3d
 import org.joml.Vector3f
+import org.lwjgl.glfw.GLFW.glfwGetTime
 import org.lwjgl.opengl.ARBVertexArrayObject.glBindVertexArray
 import org.lwjgl.opengl.ARBVertexArrayObject.glGenVertexArrays
 import org.lwjgl.opengl.GL11.GL_FLOAT
@@ -24,6 +25,7 @@ import org.lwjgl.opengl.GL15.glGenBuffers
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.*
+import kotlin.div
 
 
 interface BlockAccessor {
@@ -48,11 +50,88 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
             val index = x + z * LENGTH + y * LENGTH * LENGTH
             if (index < 0 || index >= blockData.size) return
             blockData[index] = value
-            if (x == 0) chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)?.updateChunk = true
-            if (x == LENGTH - 1) chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)?.updateChunk = true
-            if (z == 0) chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)?.updateChunk = true
-            if (z == LENGTH - 1) chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)?.updateChunk = true
+//            if (x == 0) chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)?.updateChunk = true
+//            if (x == LENGTH - 1) chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)?.updateChunk = true
+//            if (z == 0) chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)?.updateChunk = true
+//            if (z == LENGTH - 1) chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)?.updateChunk = true
         }
+    }
+
+    var meshExists: Boolean = false
+    var vao: Int = 0
+    var vaoSize: Int = 0
+    var vbo: Int = 0
+    var timeMeshCreated = 0.0
+    var updateMesh: Boolean = true
+    var verticesForUpload:MutableList<Float>? = null
+
+    fun renderMesh(): Boolean {
+        if (!updateMesh) return false
+        verticesForUpload = mutableListOf<Float>()
+        setVertices(verticesForUpload!!)
+        updateMesh = false
+        return true
+    }
+
+    fun uploadChunkMesh() {
+        if (verticesForUpload == null) return
+        if (meshExists) {
+            glDeleteBuffers(vbo)
+            glDeleteVertexArrays(vao)
+        }
+        if (verticesForUpload!!.isEmpty()) {
+            meshExists = false
+            updateMesh = false
+            verticesForUpload = null
+            timeMeshCreated = glfwGetTime()
+            this.vao = 0
+            this.vbo = 0
+            return
+        }
+        this.vao = glGenVertexArrays()
+        this.vbo = glGenBuffers()
+        glBindVertexArray(vao)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, verticesForUpload!!.toFloatArray(), GL_STATIC_DRAW)
+
+        val stride = 5 * 4 // 5 floats * 4 bytes
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0)       // position
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 3 * 4)   // tex coords
+        glEnableVertexAttribArray(1)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+        this.vaoSize = verticesForUpload!!.size;
+        meshExists = true
+        timeMeshCreated = glfwGetTime()
+        verticesForUpload = null
+    }
+
+    fun render(alpha: Double) {
+        // Draw the grid
+        if (!meshExists) return
+        val vertexCount = vaoSize / 5
+
+        // Normal cube
+        glBindTexture(GL_TEXTURE_2D, Game.textureId)
+        glUniform1i(glGetUniformLocation(Game.shaderProgram, "texture1"), 0)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        val model = Matrix4f().identity().translate(
+            Vector3f(
+                (chunk.coords.x * LENGTH-chunk.world.camera.position.x).toFloat(),
+                -chunk.world.camera.position.y.toFloat(),
+                (chunk.coords.y * LENGTH-chunk.world.camera.position.z).toFloat()
+            )
+        )  // adjust position/scale if needed
+        val modelBuffer = FloatArray(16)
+        model.get(modelBuffer)
+        glUniformMatrix4fv(Game.modelLoc, false, modelBuffer)
+
+        glBindVertexArray(vao)
+        glDrawArrays(GL_TRIANGLES, 0, vertexCount)
+        glBindVertexArray(0)
     }
 
     fun setVertices(vertices: MutableList<Float>) {
@@ -104,20 +183,13 @@ class Chunk(
         }
     }
 
-    private var meshExists: Boolean = false
-    var vao: Int = 0
-    var vaoSize: Int = 0
-    var vbo: Int = 0
-    var updateChunk: Boolean = true
-    var verticesForUpload:MutableList<Float>? = null
 
-
-    fun renderMesh() {
-        verticesForUpload = mutableListOf<Float>()
-        for (i in 0..<numberOfSections) {
-            sections[i].setVertices(verticesForUpload!!)
+    fun renderMesh(): Boolean {
+        var hasRendered = false
+        for (i in 0..<numberOfSections){
+            if (sections[i].renderMesh()) hasRendered = true
         }
-        updateChunk = false
+        return hasRendered
 //        if (meshExists) {
 //            glDeleteBuffers(vbo)
 //            glDeleteVertexArrays(vao)
@@ -142,58 +214,15 @@ class Chunk(
     }
 
     fun uploadChunkMesh() {
-        if (meshExists) {
-            glDeleteBuffers(vbo)
-            glDeleteVertexArrays(vao)
+        for (i in 0..<numberOfSections){
+            sections[i].uploadChunkMesh()
         }
-        this.vao = glGenVertexArrays()
-        this.vbo = glGenBuffers()
-        glBindVertexArray(vao)
-        glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        glBufferData(GL_ARRAY_BUFFER, verticesForUpload!!.toFloatArray(), GL_STATIC_DRAW)
-
-        val stride = 5 * 4 // 5 floats * 4 bytes
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0)       // position
-        glEnableVertexAttribArray(0)
-        glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 3 * 4)   // tex coords
-        glEnableVertexAttribArray(1)
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
-
-        this.vaoSize = verticesForUpload!!.size;
-        meshExists = true
-        verticesForUpload = null
     }
 
 
-    fun render(deltaTime: Double) {
-
-        // Upload to VBO/VAO
-
-
-        if (meshExists) {
-            // Draw the grid
-            val vertexCount = vaoSize / 5
-
-            // Normal cube
-            glBindTexture(GL_TEXTURE_2D, Game.textureId)
-            glUniform1i(glGetUniformLocation(Game.shaderProgram, "texture1"), 0)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-            val model = Matrix4f().identity().translate(
-                Vector3f(
-                    (coords.x * ChunkSection.LENGTH).toFloat(),
-                    -(ChunkSection.LENGTH * ySectionsOffset).toFloat(),
-                    (coords.y * ChunkSection.LENGTH).toFloat()
-                )
-            )  // adjust position/scale if needed
-            val modelBuffer = FloatArray(16)
-            model.get(modelBuffer)
-            glUniformMatrix4fv(Game.modelLoc, false, modelBuffer)
-
-            glBindVertexArray(vao)
-            glDrawArrays(GL_TRIANGLES, 0, vertexCount)
-            glBindVertexArray(0)
+    fun render(alpha: Double) {
+        for (i in 0..<numberOfSections){
+            sections[i].render(alpha)
         }
     }
 

@@ -11,7 +11,7 @@ import dev.wbell.buildtopia.app.game.session.world.chunk.ChunkSection
 import dev.wbell.buildtopia.app.game.session.world.player.Player
 import dev.wbell.buildtopia.app.game.settings.SettingKey
 import dev.wbell.buildtopia.app.game.settings.Settings
-import dev.wbell.buildtopia.app.getCameraMatrix
+import dev.wbell.buildtopia.app.getCameraRotationMatrix
 import org.joml.Vector2i
 import org.joml.Vector3d
 import org.lwjgl.glfw.GLFW.*
@@ -20,6 +20,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.abs
+import kotlin.random.Random
 
 fun floorDiv(a: Int, b: Int): Int {
     // rounds down (towards -∞), unlike / which rounds toward 0
@@ -45,17 +47,22 @@ class World(val player: Player, val session: Session) {
     var lastTick = glfwGetTime()
 
     init {
+        val centerChunk = Vector2i(
+            (player.position.x / ChunkSection.LENGTH).toInt(),
+            (player.position.z / ChunkSection.LENGTH).toInt()
+        )
         val renderDistance = Settings.get(SettingKey.RENDERDISTANCE, 32)!!
         for (x in -renderDistance..<renderDistance) {
             for (z in -renderDistance..<renderDistance) {
-                chunks[packChunkKey(x, z)] =
+                val size = (16*16)*(64)
+                chunks[packChunkKey(centerChunk.x+x, centerChunk.y+z)] =
                     Chunk(
                         this,
-                        Vector2i(x, z),
+                        Vector2i(centerChunk.x+x, centerChunk.y+z),
                         24,
                         4,
                         Array(ChunkSection.LENGTH * ChunkSection.LENGTH * ChunkSection.LENGTH * 24) {
-                            if (it < 34000) Block() else null
+                            if (it < size+(16*16*Random.nextInt(0,2))) Block() else null
                         })
             }
         }
@@ -77,7 +84,7 @@ class World(val player: Player, val session: Session) {
                 for (dx in -renderDistance - 1..renderDistance) {
                     for (dz in -renderDistance - 1..renderDistance) {
                         val chunk = getChunk(centerChunk.x + dx, centerChunk.y + dz)
-                        if (chunk != null && chunk.updateChunk) {
+                        if (chunk != null) {
                             val dist2 = dx * dx + dz * dz
                             chunksToUpdate.add(chunk to dist2)
                         }
@@ -87,8 +94,7 @@ class World(val player: Player, val session: Session) {
 // Sort by distance
                 chunksToUpdate.sortBy { it.second }
                 for ((chunk, _) in chunksToUpdate) {
-                    chunk.renderMesh() // background mesh generation
-                    chunkMeshQueue.add { chunk.uploadChunkMesh() } // main thread upload
+                    if (chunk.renderMesh()) chunkMeshQueue.add { chunk.uploadChunkMesh() } // main thread upload
                 }
                 delay(tickTime)
             }
@@ -106,7 +112,7 @@ class World(val player: Player, val session: Session) {
         }
     }
 
-    var camera: Camera = Camera(Vector3d(0.0, 0.0, 0.0), 0.0, 0.0, 0.0)
+    var camera: Camera = Camera(Vector3d(0.0, 0.0, 0.0), 0f, 0f, 0f)
 
     private fun packChunkKey(x: Int, z: Int): Long =
         x.toLong() and 0xFFFFFFFFL or ((z.toLong() and 0xFFFFFFFFL) shl 32)
@@ -146,7 +152,7 @@ class World(val player: Player, val session: Session) {
         while (chunkMeshQueue.isNotEmpty()) {
             chunkMeshQueue.poll()?.invoke()
         }
-        val deltaTickTime = ((glfwGetTime() - lastTick) / 0.05).coerceIn(0.0, 1.0)
+        val alpha = ((glfwGetTime() - lastTick) / 0.05).coerceIn(0.0, 1.0)
         glEnable(GL_DEPTH_TEST)
         glClearColor(0f, 0.6f, 1f, 1f)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
@@ -161,9 +167,9 @@ class World(val player: Player, val session: Session) {
             player.position.y -= deltaTime * 10
         }
 
-        camera = player.getCamera(deltaTickTime)
+        camera = player.getCamera(alpha)
 
-        val view = getCameraMatrix(camera.position, camera.pitch, camera.yaw, camera.roll)
+        val view = getCameraRotationMatrix(camera.pitch, camera.yaw, camera.roll)
         val viewBuffer = FloatArray(16)
         view.get(viewBuffer)
         glUniformMatrix4fv(Game.viewLoc, false, viewBuffer)
@@ -176,7 +182,7 @@ class World(val player: Player, val session: Session) {
         for (dx in -renderDistance - 1..renderDistance) {
             for (dz in -renderDistance - 1..renderDistance) {
                 val chunk = getChunk(centerChunk.x + dx, centerChunk.y + dz)
-                chunk?.render(deltaTickTime)
+                chunk?.render(alpha)
             }
         }
 
