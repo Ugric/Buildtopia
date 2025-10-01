@@ -18,6 +18,7 @@ import org.lwjgl.opengl.GL13.*
 import org.lwjgl.stb.STBImage
 import java.nio.IntBuffer
 import kotlin.math.PI
+import kotlin.random.Random
 
 
 fun loadTexture(path: String): Int {
@@ -28,7 +29,6 @@ fun loadTexture(path: String): Int {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-
 
 
     // Load image from resources
@@ -90,8 +90,10 @@ object Game {
             GL.createCapabilities()
             glEnable(GL_MULTISAMPLE)
             glEnable(GL_DEPTH_TEST)
-            session.World = World(Player(Vector3d(0.0, 100.0, 0.0), 0f,0f), session)
-            session.World!!.player.world = session.World
+            glEnable(GL_CULL_FACE)       // turn on face culling
+            glCullFace(GL_BACK)          // cull back faces
+            glFrontFace(GL_CCW)          // counter-clockwise triangles are front-facing
+            glDepthFunc(GL_LESS)
 
             textureId = loadTexture("/resource_pack/textures/block/cobblestone.png")
 
@@ -106,6 +108,8 @@ object Game {
             modelLoc = glGetUniformLocation(shaderProgram, "model")
             viewLoc = glGetUniformLocation(shaderProgram, "view")
             projLoc = glGetUniformLocation(shaderProgram, "projection")
+            session.World = World(Player(Vector3d(0.0, 4.0, 0.0), 0f, 0f), session)
+            session.World!!.player.world = session.World
 
             // Initial projection
 
@@ -136,19 +140,19 @@ object Game {
                 }
             }
 
-        glfwSetCursorPosCallback(window) { window, xpos, ypos ->
-            if (cursorDisabled && Cursor.lastX != null && Cursor.lastY != null) {
-                val dx = (xpos - Cursor.lastX!!) / width
-                val dy = (ypos - Cursor.lastY!!) / height
-                session.World?.player?.yaw -= dx.toFloat() * 3.5f
-                session.World?.player?.pitch -= dy.toFloat() * 3.5f
-                session.World?.player?.pitch?.let {
-                    session.World?.player?.pitch = it.coerceIn(-PI.toFloat() / 2, PI.toFloat() / 2)
+            glfwSetCursorPosCallback(window) { window, xpos, ypos ->
+                if (cursorDisabled && Cursor.lastX != null && Cursor.lastY != null) {
+                    val dx = (xpos - Cursor.lastX!!) / width
+                    val dy = (ypos - Cursor.lastY!!) / height
+                    session.World?.player?.yaw -= dx.toFloat() * 3.5f
+                    session.World?.player?.pitch -= dy.toFloat() * 3.5f
+                    session.World?.player?.pitch?.let {
+                        session.World?.player?.pitch = it.coerceIn(-PI.toFloat() / 2, PI.toFloat() / 2)
+                    }
                 }
+                Cursor.lastX = xpos
+                Cursor.lastY = ypos
             }
-            Cursor.lastX = xpos
-            Cursor.lastY = ypos
-        }
         }
     }
 
@@ -157,7 +161,8 @@ object Game {
         glfwTerminate()
     }
 
-    fun render(deltaTime: Double) {
+    fun render(deltaTime: Double): Boolean {
         session.World?.render(deltaTime)
+        return true
     }
 }

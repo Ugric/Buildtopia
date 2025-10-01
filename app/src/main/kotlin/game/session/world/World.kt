@@ -8,19 +8,17 @@ import dev.wbell.buildtopia.app.game.session.world.chunk.Block.Block
 import dev.wbell.buildtopia.app.game.session.world.chunk.BlockAccessor
 import dev.wbell.buildtopia.app.game.session.world.chunk.Chunk
 import dev.wbell.buildtopia.app.game.session.world.chunk.ChunkSection
+import dev.wbell.buildtopia.app.game.session.world.chunk.LightAccessor
 import dev.wbell.buildtopia.app.game.session.world.player.Player
 import dev.wbell.buildtopia.app.game.settings.SettingKey
 import dev.wbell.buildtopia.app.game.settings.Settings
-import dev.wbell.buildtopia.app.getCameraRotationMatrix
 import org.joml.Vector2i
 import org.joml.Vector3d
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL20.*
-import kotlin.math.cos
-import kotlin.math.sin
 import kotlinx.coroutines.*
+import org.joml.Matrix4f
 import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.math.abs
 import kotlin.random.Random
 
 fun floorDiv(a: Int, b: Int): Int {
@@ -45,25 +43,27 @@ class World(val player: Player, val session: Session) {
     private val chunks = mutableMapOf<Long, Chunk>()
     private var isActive = true
     var lastTick = glfwGetTime()
+    var dayNightLoc = glGetUniformLocation(Game.shaderProgram, "dayNight")
 
     init {
         val centerChunk = Vector2i(
             (player.position.x / ChunkSection.LENGTH).toInt(),
             (player.position.z / ChunkSection.LENGTH).toInt()
         )
-        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE, 32)!!
+        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 32
         for (x in -renderDistance..<renderDistance) {
             for (z in -renderDistance..<renderDistance) {
-                val size = (16*16)*(64)
-                chunks[packChunkKey(centerChunk.x+x, centerChunk.y+z)] =
+                val size = (16 * 16) * (64)
+                chunks[packChunkKey(centerChunk.x + x, centerChunk.y + z)] =
                     Chunk(
                         this,
-                        Vector2i(centerChunk.x+x, centerChunk.y+z),
+                        Vector2i(centerChunk.x + x, centerChunk.y + z),
                         24,
                         4,
                         Array(ChunkSection.LENGTH * ChunkSection.LENGTH * ChunkSection.LENGTH * 24) {
-                            if (it < size+(16*16*Random.nextInt(0,2))) Block() else null
+                            if (it < size + (16 * 16 * Random.nextInt(0, 5))) Block() else null
                         })
+                chunks[packChunkKey(centerChunk.x + x, centerChunk.y + z)]!!.initializeSunlight()
             }
         }
         startPhysics()
@@ -78,7 +78,7 @@ class World(val player: Player, val session: Session) {
                     (player.position.x / ChunkSection.LENGTH).toInt(),
                     (player.position.z / ChunkSection.LENGTH).toInt()
                 )
-                val renderDistance = Settings.get(SettingKey.RENDERDISTANCE, 12)!!
+                val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 12
                 val chunksToUpdate = mutableListOf<Pair<Chunk, Int>>() // Pair(chunk, distance^2)
 
                 for (dx in -renderDistance - 1..renderDistance) {
@@ -144,6 +144,39 @@ class World(val player: Player, val session: Session) {
         }
     }
 
+
+    val sunLights = object : LightAccessor {
+        override operator fun get(x: Int, y: Int, z: Int): Int {
+            return getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.sunLights[floorMod(
+                x,
+                ChunkSection.LENGTH
+            ), y, floorMod(z, ChunkSection.LENGTH)]?:0
+        }
+
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
+            getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.sunLights[floorMod(
+                x,
+                ChunkSection.LENGTH
+            ), y, floorMod(z, ChunkSection.LENGTH)] = value
+        }
+    }
+
+    val blockLights = object : LightAccessor {
+        override operator fun get(x: Int, y: Int, z: Int): Int {
+            return getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.blockLights[floorMod(
+                x,
+                ChunkSection.LENGTH
+            ), y, floorMod(z, ChunkSection.LENGTH)]?:0
+        }
+
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
+            getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.blockLights[floorMod(
+                x,
+                ChunkSection.LENGTH
+            ), y, floorMod(z, ChunkSection.LENGTH)] = value
+        }
+    }
+
     fun clean() {
 
     }
@@ -156,40 +189,27 @@ class World(val player: Player, val session: Session) {
         glEnable(GL_DEPTH_TEST)
         glClearColor(0f, 0.6f, 1f, 1f)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-        val forwardX = sin(player.yaw)
-        val forwardZ = cos(player.yaw)
-//        if (glfwGetKey(Game.window!!, GLFW_KEY_W) == GLFW_PRESS) {
-//            player.position.x-=forwardX*deltaTime*10
-//            player.position.z-=forwardZ*deltaTime*10
-//        }
-
-        if (glfwGetKey(Game.window!!, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-            player.position.y -= deltaTime * 10
-        }
+        glUniform1f(dayNightLoc, 1f)
 
         camera = player.getCamera(alpha)
 
-        val view = getCameraRotationMatrix(camera.pitch, camera.yaw, camera.roll)
-        val viewBuffer = FloatArray(16)
-        view.get(viewBuffer)
-        glUniformMatrix4fv(Game.viewLoc, false, viewBuffer)
+        val view = Matrix4f().identity().rotateX(-camera.pitch).rotateY(-camera.yaw) // copy the camera matrix
+
+// Now upload
+        val buf = FloatArray(16)
+        view.get(buf)
+        glUniformMatrix4fv(Game.viewLoc, false, buf)
 
         val centerChunk = Vector2i(
             (player.position.x / ChunkSection.LENGTH).toInt(),
             (player.position.z / ChunkSection.LENGTH).toInt()
         )
-        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE, 12)!!
+        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 12
         for (dx in -renderDistance - 1..renderDistance) {
             for (dz in -renderDistance - 1..renderDistance) {
                 val chunk = getChunk(centerChunk.x + dx, centerChunk.y + dz)
                 chunk?.render(alpha)
             }
-        }
-
-
-        window?.let { window ->
-            glfwSwapBuffers(window)
-            glfwPollEvents()
         }
     }
 

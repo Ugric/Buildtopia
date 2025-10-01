@@ -26,6 +26,7 @@ import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.*
 import kotlin.div
+import kotlin.random.Random
 
 
 interface BlockAccessor {
@@ -33,10 +34,71 @@ interface BlockAccessor {
     operator fun set(x: Int, y: Int, z: Int, value: Block?)
 }
 
+interface LightAccessor {
+    operator fun get(x: Int, y: Int, z: Int): Int
+    operator fun set(x: Int, y: Int, z: Int, value: Int)
+}
+
 class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: Int) {
     companion object {
         const val LENGTH = 16
         const val SIZE = LENGTH * LENGTH * LENGTH
+    }
+
+    val sunLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2)
+    val blockLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2)
+
+
+    val sunLights = object : LightAccessor {
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
+            val index = x + y * LENGTH + z * LENGTH * LENGTH
+            val byteIndex = index / 2
+            val high = index % 2 == 0
+            val v = value.coerceIn(0, 15)
+
+            if (high) {
+                sunLightData[byteIndex] = ((v shl 4) or (sunLightData[byteIndex].toInt() and 0x0F)).toByte()
+            } else {
+                sunLightData[byteIndex] = ((sunLightData[byteIndex].toInt() and 0xF0) or v).toByte()
+            }
+        }
+
+        override operator fun get(x: Int, y: Int, z: Int): Int {
+            val index = x + y * LENGTH + z * LENGTH * LENGTH
+            val byteIndex = index / 2
+            val high = index % 2 == 0
+            return if (high) {
+                (sunLightData[byteIndex].toInt() shr 4) and 0x0F
+            } else {
+                sunLightData[byteIndex].toInt() and 0x0F
+            }
+        }
+    }
+
+    val blockLights = object : LightAccessor {
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
+            val index = x + y * LENGTH + z * LENGTH * LENGTH
+            val byteIndex = index / 2
+            val high = index % 2 == 0
+            val v = value.coerceIn(0, 15)
+
+            if (high) {
+                blockLightData[byteIndex] = ((v shl 4) or (blockLightData[byteIndex].toInt() and 0x0F)).toByte()
+            } else {
+                blockLightData[byteIndex] = ((blockLightData[byteIndex].toInt() and 0xF0) or v).toByte()
+            }
+        }
+
+        override operator fun get(x: Int, y: Int, z: Int): Int {
+            val index = x + y * LENGTH + z * LENGTH * LENGTH
+            val byteIndex = index / 2
+            val high = index % 2 == 0
+            return if (high) {
+                (blockLightData[byteIndex].toInt() shr 4) and 0x0F
+            } else {
+                blockLightData[byteIndex].toInt() and 0x0F
+            }
+        }
     }
 
     val blocks = object : BlockAccessor {
@@ -63,7 +125,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
     var vbo: Int = 0
     var timeMeshCreated = 0.0
     var updateMesh: Boolean = true
-    var verticesForUpload:MutableList<Float>? = null
+    var verticesForUpload: MutableList<Float>? = null
 
     fun renderMesh(): Boolean {
         if (!updateMesh) return false
@@ -73,7 +135,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         return true
     }
 
-    fun uploadChunkMesh() {
+    fun uploadMesh() {
         if (verticesForUpload == null) return
         if (meshExists) {
             glDeleteBuffers(vbo)
@@ -94,11 +156,20 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
         glBufferData(GL_ARRAY_BUFFER, verticesForUpload!!.toFloatArray(), GL_STATIC_DRAW)
 
-        val stride = 5 * 4 // 5 floats * 4 bytes
+        val stride = 7 * 4 // 7 floats * 4 bytes
         glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0)       // position
         glEnableVertexAttribArray(0)
         glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 3 * 4)   // tex coords
         glEnableVertexAttribArray(1)
+
+
+        // Block light
+        glVertexAttribPointer(2, 1, GL_FLOAT, false, stride, (5 * 4).toLong())
+        glEnableVertexAttribArray(2)
+
+        // Sun light
+        glVertexAttribPointer(3, 1, GL_FLOAT, false, stride, (6 * 4).toLong())
+        glEnableVertexAttribArray(3)
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
@@ -110,25 +181,30 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
     }
 
     fun render(alpha: Double) {
-        // Draw the grid
         if (!meshExists) return
-        val vertexCount = vaoSize / 5
+        val vertexCount = vaoSize / 7  // <-- changed
 
-        // Normal cube
+        // Bind texture
         glBindTexture(GL_TEXTURE_2D, Game.textureId)
         glUniform1i(glGetUniformLocation(Game.shaderProgram, "texture1"), 0)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-        val model = Matrix4f().identity().translate(
-            Vector3f(
-                (chunk.coords.x * LENGTH-chunk.world.camera.position.x).toFloat(),
-                -chunk.world.camera.position.y.toFloat(),
-                (chunk.coords.y * LENGTH-chunk.world.camera.position.z).toFloat()
-            )
-        )  // adjust position/scale if needed
-        val modelBuffer = FloatArray(16)
-        model.get(modelBuffer)
-        glUniformMatrix4fv(Game.modelLoc, false, modelBuffer)
 
+        // Build model matrix per chunk
+        val model = Matrix4d()
+            .identity()
+            .translate(
+                chunk.coords.x * LENGTH - chunk.world.camera.position.x,
+                -chunk.world.camera.position.y,
+                chunk.coords.y * LENGTH - chunk.world.camera.position.z
+            )
+
+        // Upload model matrix
+        val modelBuf = DoubleArray(16)
+        model.get(modelBuf)
+        val modelFloatBuf = FloatArray(16) { modelBuf[it].toFloat() }
+        glUniformMatrix4fv(Game.modelLoc, false, modelFloatBuf)
+
+        // Draw
         glBindVertexArray(vao)
         glDrawArrays(GL_TRIANGLES, 0, vertexCount)
         glBindVertexArray(0)
@@ -142,12 +218,12 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                     if (blocks[x, sectionY, z] == null) continue;
                     val worldX = x + chunk.coords.x * LENGTH
                     val worldZ = z + chunk.coords.y * LENGTH
-                    if (chunk.world.blocks[worldX, y + 1, worldZ] == null) addFace(vertices, x, y, z, 1f, "top")
-                    if (chunk.world.blocks[worldX, y - 1, worldZ] == null) addFace(vertices, x, y, z, 1f, "bottom")
-                    if (chunk.world.blocks[worldX + 1, y, worldZ] == null) addFace(vertices, x, y, z, 1f, "right")
-                    if (chunk.world.blocks[worldX - 1, y, worldZ] == null) addFace(vertices, x, y, z, 1f, "left")
-                    if (chunk.world.blocks[worldX, y, worldZ + 1] == null) addFace(vertices, x, y, z, 1f, "front")
-                    if (chunk.world.blocks[worldX, y, worldZ - 1] == null) addFace(vertices, x, y, z, 1f, "back")
+                    if (chunk.world.blocks[worldX, y + 1, worldZ] == null) addFace(vertices, x, y, z, chunk.coords, 1f, "top")
+                    if (chunk.world.blocks[worldX, y - 1, worldZ] == null) addFace(vertices, x, y, z, chunk.coords, 1f, "bottom")
+                    if (chunk.world.blocks[worldX + 1, y, worldZ] == null) addFace(vertices, x, y, z, chunk.coords, 1f, "right")
+                    if (chunk.world.blocks[worldX - 1, y, worldZ] == null) addFace(vertices, x, y, z, chunk.coords, 1f, "left")
+                    if (chunk.world.blocks[worldX, y, worldZ + 1] == null) addFace(vertices, x, y, z, chunk.coords, 1f, "front")
+                    if (chunk.world.blocks[worldX, y, worldZ - 1] == null) addFace(vertices, x, y, z, chunk.coords, 1f, "back")
                 }
             }
         }
@@ -161,7 +237,7 @@ class Chunk(
     val ySectionsOffset: Int,
     val blockData: Array<Block?>
 ) {
-    private val sections: Array<ChunkSection> = Array(numberOfSections) { sectionIndex ->
+    private var sections: Array<ChunkSection> = Array(numberOfSections) { sectionIndex ->
         ChunkSection(Array(ChunkSection.SIZE) { i ->
             val x = i % ChunkSection.LENGTH
             val z = (i / ChunkSection.LENGTH) % ChunkSection.LENGTH
@@ -183,10 +259,55 @@ class Chunk(
         }
     }
 
+    fun initializeSunlight() {
+        for (x in 0 until ChunkSection.LENGTH) {
+            for (z in 0 until ChunkSection.LENGTH) {
+                var sunLevel = 15
+                for (sectionIndex in (numberOfSections - 1) downTo 0) {
+                    val section = sections[sectionIndex]
+                    for (y in ChunkSection.LENGTH - 1 downTo 0) {
+                        val globalY = sectionIndex * ChunkSection.LENGTH + y - ySectionsOffset * ChunkSection.LENGTH
+                        val block = section.blocks[x, y, z]
+                        if (block != null) sunLevel = 0
+                        section.sunLights[x, y, z] = sunLevel
+                    }
+                }
+            }
+        }
+    }
+
+    val sunLights = object : LightAccessor {
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
+            val sectionIndex = floorDiv((y - ySectionsOffset * ChunkSection.LENGTH), ChunkSection.LENGTH)
+            if (sectionIndex !in 0..<numberOfSections) return
+            sections[sectionIndex].sunLights[x, floorMod(y, ChunkSection.LENGTH), z] = value
+        }
+
+        override operator fun get(x: Int, y: Int, z: Int): Int {
+            val sectionIndex = floorDiv((y + ySectionsOffset * ChunkSection.LENGTH), ChunkSection.LENGTH)
+            if (sectionIndex !in 0..<numberOfSections) return 0
+            return sections[sectionIndex].sunLights[x, floorMod(y, ChunkSection.LENGTH), z]
+        }
+    }
+
+    val blockLights = object : LightAccessor {
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
+            val sectionIndex = floorDiv((y - ySectionsOffset * ChunkSection.LENGTH), ChunkSection.LENGTH)
+            if (sectionIndex !in 0..<numberOfSections) return
+            sections[sectionIndex].blockLights[x, floorMod(y, ChunkSection.LENGTH), z] = value
+        }
+
+        override operator fun get(x: Int, y: Int, z: Int): Int {
+            val sectionIndex = floorDiv((y + ySectionsOffset * ChunkSection.LENGTH), ChunkSection.LENGTH)
+            if (sectionIndex !in 0..<numberOfSections) return 0
+            return sections[sectionIndex].blockLights[x, floorMod(y, ChunkSection.LENGTH), z]
+        }
+    }
+
 
     fun renderMesh(): Boolean {
         var hasRendered = false
-        for (i in 0..<numberOfSections){
+        for (i in 0..<numberOfSections) {
             if (sections[i].renderMesh()) hasRendered = true
         }
         return hasRendered
@@ -214,14 +335,14 @@ class Chunk(
     }
 
     fun uploadChunkMesh() {
-        for (i in 0..<numberOfSections){
-            sections[i].uploadChunkMesh()
+        for (i in 0..<numberOfSections) {
+            sections[i].uploadMesh()
         }
     }
 
 
     fun render(alpha: Double) {
-        for (i in 0..<numberOfSections){
+        for (i in 0..<numberOfSections) {
             sections[i].render(alpha)
         }
     }

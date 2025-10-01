@@ -3,6 +3,7 @@ package dev.wbell.buildtopia.app.game.session.world.player
 import dev.wbell.buildtopia.app.game.Game
 import dev.wbell.buildtopia.app.game.camera.Camera
 import dev.wbell.buildtopia.app.game.session.world.World
+import org.joml.Matrix4d
 import org.joml.Vector2d
 import org.joml.Vector2f
 import org.joml.Vector3d
@@ -43,9 +44,9 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
     val height = 1.8
     fun getBoundingBox(): AABB {
         return AABB(
-            position.x-width/2, position.y,
-            position.z-width/2, position.x + width/2,
-            position.y + height, position.z + width/2
+            position.x - width / 2, position.y,
+            position.z - width / 2, position.x + width / 2,
+            position.y + height, position.z + width / 2
         )
     }
 
@@ -64,10 +65,12 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
                 for (z in minZ..maxZ) {
                     val block = world!!.blocks[x, y, z]
                     if (block != null) {
-                        boxes.add(AABB(
-                            x - 0.5, y.toDouble(), z - 0.5,
-                            x + 0.5, y + 1.0, z + 0.5
-                        ))
+                        boxes.add(
+                            AABB(
+                                x - 0.5, y.toDouble(), z - 0.5,
+                                x + 0.5, y + 1.0, z + 0.5
+                            )
+                        )
                     }
                 }
             }
@@ -78,8 +81,7 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
 
     fun tick() {
         lastPosition.set(position)
-        println(position.y)
-        velocity.y = (velocity.y-0.08)*0.98
+        velocity.y = (velocity.y - 0.08) * 0.98
         val slipperiness = if (isOnGround) 0.6 else 1.0
         val forward = Vector2f(-sin(yaw), -cos(yaw))
         val left = Vector2f(-cos(yaw), sin(yaw))
@@ -117,7 +119,6 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
         moveAxis(velocity.x, 0.0, 0.0) // move along X
         moveAxis(0.0, velocity.y, 0.0) // move along Y
         moveAxis(0.0, 0.0, velocity.z) // move along Z
-        println(velocity)
     }
 
 
@@ -153,14 +154,14 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
 
                     // X-axis collision
                     if (stepX != 0.0) {
-                        position.x = if (stepX > 0) blockBB.minX - width/2 else blockBB.maxX + width/2
+                        position.x = if (stepX > 0) blockBB.minX - width / 2 else blockBB.maxX + width / 2
                         velocity.x = 0.0
                         collidedX = true
                     }
 
                     // Z-axis collision
                     if (stepZ != 0.0) {
-                        position.z = if (stepZ > 0) blockBB.minZ - width/2 else blockBB.maxZ + width/2
+                        position.z = if (stepZ > 0) blockBB.minZ - width / 2 else blockBB.maxZ + width / 2
                         velocity.z = 0.0
                         collidedZ = true
                     }
@@ -175,12 +176,11 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
     }
 
     fun getCamera(alpha: Double): Camera {
-        val interpPos = Vector3d(
+        return Camera(Vector3d(
             lerp(lastPosition.x, position.x, alpha),
-            lerp(lastPosition.y, position.y, alpha),
+            lerp(lastPosition.y, position.y, alpha)+1,
             lerp(lastPosition.z, position.z, alpha)
-        )
-        return Camera(interpPos.add(0.0, 1.0, 0.0), pitch, yaw, 0f)
+        ), pitch, yaw, 0f)
     }
 
     private fun lerp(a: Double, b: Double, t: Double): Double {

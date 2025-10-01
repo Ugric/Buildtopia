@@ -33,14 +33,6 @@ fun createShader(vertexSrc: String, fragmentSrc: String): Int {
     return program
 }
 
-fun getCameraRotationMatrix(pitch: Float, yaw: Float, roll: Float): Matrix4f {
-    val view = Matrix4f()
-    view.identity().rotateX(-pitch)  // pitch = X
-        .rotateY(-yaw)    // yaw   = Y
-        .rotateZ(-roll)      // move world opposite to camera
-    return view
-}
-
 fun updateProjection(shaderProgram: Int, width: Int, height: Int) {
     glViewport(0, 0, width, height)
 
@@ -79,13 +71,15 @@ fun main() {
 
     Game.init()
 
-    Game.window?.let {
-        window->
+    Game.window?.let { window ->
         while (!glfwWindowShouldClose(window)) {
             val currentTime = glfwGetTime()
             val deltaTime = currentTime - lastTime // in seconds
-            lastTime = currentTime
-            Game.render(deltaTime)
+            if (Game.render(deltaTime)) {
+                lastTime = currentTime
+                glfwSwapBuffers(window)
+                glfwPollEvents()
+            }
 //        isOnGround = cameraPos.y <= surfaceLevel + 2
 //        //yaw += 0.5f
 //        //cameraPos.y += 0.25f*deltaTime

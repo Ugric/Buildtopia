@@ -15,8 +15,8 @@ object Settings {
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun <T : Any> get(key: SettingKey<T>, defaultValue: T? = null): T? {
+    fun <T : Any> get(key: SettingKey<T>): T? {
         val value = data[key]
-        return if (value != null) value as T else defaultValue
+        return value as T?
     }
 }
