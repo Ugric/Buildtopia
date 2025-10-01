@@ -19,6 +19,8 @@ import org.lwjgl.opengl.GL20.*
 import kotlinx.coroutines.*
 import org.joml.Matrix4f
 import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.PI
+import kotlin.math.sin
 import kotlin.random.Random
 
 fun floorDiv(a: Int, b: Int): Int {
@@ -44,13 +46,14 @@ class World(val player: Player, val session: Session) {
     private var isActive = true
     var lastTick = glfwGetTime()
     var dayNightLoc = glGetUniformLocation(Game.shaderProgram, "dayNight")
+    var dayNightTick = 0
 
     init {
         val centerChunk = Vector2i(
             (player.position.x / ChunkSection.LENGTH).toInt(),
             (player.position.z / ChunkSection.LENGTH).toInt()
         )
-        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 32
+        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 12
         for (x in -renderDistance..<renderDistance) {
             for (z in -renderDistance..<renderDistance) {
                 val size = (16 * 16) * (64)
@@ -186,10 +189,11 @@ class World(val player: Player, val session: Session) {
             chunkMeshQueue.poll()?.invoke()
         }
         val alpha = ((glfwGetTime() - lastTick) / 0.05).coerceIn(0.0, 1.0)
+        val dayNight = (((dayNightTick+alpha).toFloat()/24000)*2*PI.toFloat()).coerceIn(0f, 1f)
         glEnable(GL_DEPTH_TEST)
-        glClearColor(0f, 0.6f, 1f, 1f)
+        glClearColor(0f, 0.6f*dayNight, 1f*dayNight, 1f*dayNight)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-        glUniform1f(dayNightLoc, 1f)
+        glUniform1f(dayNightLoc, dayNight)
 
         camera = player.getCamera(alpha)
 
@@ -214,6 +218,7 @@ class World(val player: Player, val session: Session) {
     }
 
     fun tick() {
+        dayNightTick+=1
         player.tick()
     }
 }
