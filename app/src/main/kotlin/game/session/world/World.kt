@@ -56,17 +56,19 @@ class World(val player: Player, val session: Session) {
         val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 12
         for (x in -renderDistance..<renderDistance) {
             for (z in -renderDistance..<renderDistance) {
-                val size = (16 * 16) * (64)
+
                 chunks[packChunkKey(centerChunk.x + x, centerChunk.y + z)] =
                     Chunk(
                         this,
                         Vector2i(centerChunk.x + x, centerChunk.y + z),
                         24,
                         4,
-                        Array(ChunkSection.LENGTH * ChunkSection.LENGTH * ChunkSection.LENGTH * 24) {
-                            if (it < size + (16 * 16 * Random.nextInt(0, 5))) Block() else null
+                        Array(ChunkSection.LENGTH * ChunkSection.LENGTH * ChunkSection.LENGTH * 24) { i ->
+                            val x = i % ChunkSection.LENGTH
+                            val z = (i / ChunkSection.LENGTH) % ChunkSection.LENGTH
+                            val y = (i / (ChunkSection.LENGTH * ChunkSection.LENGTH)) - 4 * ChunkSection.LENGTH
+                            if (y == 0 || (y == 10 && Random.nextFloat()>0.01)) Block() else null
                         })
-                chunks[packChunkKey(centerChunk.x + x, centerChunk.y + z)]!!.initializeSunlight()
             }
         }
         startPhysics()
@@ -97,7 +99,10 @@ class World(val player: Player, val session: Session) {
 // Sort by distance
                 chunksToUpdate.sortBy { it.second }
                 for ((chunk, _) in chunksToUpdate) {
-                    if (chunk.renderMesh()) chunkMeshQueue.add { chunk.uploadChunkMesh() } // main thread upload
+                    if (chunk.toRenderMesh()) {
+                        chunk.renderMesh()
+                        chunkMeshQueue.add { chunk.uploadChunkMesh() }
+                    } // main thread upload
                 }
                 delay(tickTime)
             }
@@ -153,7 +158,7 @@ class World(val player: Player, val session: Session) {
             return getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.sunLights[floorMod(
                 x,
                 ChunkSection.LENGTH
-            ), y, floorMod(z, ChunkSection.LENGTH)]?:0
+            ), y, floorMod(z, ChunkSection.LENGTH)] ?: 15
         }
 
         override operator fun set(x: Int, y: Int, z: Int, value: Int) {
@@ -169,7 +174,7 @@ class World(val player: Player, val session: Session) {
             return getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.blockLights[floorMod(
                 x,
                 ChunkSection.LENGTH
-            ), y, floorMod(z, ChunkSection.LENGTH)]?:0
+            ), y, floorMod(z, ChunkSection.LENGTH)] ?: 0
         }
 
         override operator fun set(x: Int, y: Int, z: Int, value: Int) {
@@ -189,9 +194,9 @@ class World(val player: Player, val session: Session) {
             chunkMeshQueue.poll()?.invoke()
         }
         val alpha = ((glfwGetTime() - lastTick) / 0.05).coerceIn(0.0, 1.0)
-        val dayNight = (((dayNightTick+alpha).toFloat()/24000)*2*PI.toFloat()).coerceIn(0f, 1f)
+        val dayNight = (((dayNightTick + alpha).toFloat() / 24000) * 2 * PI.toFloat()).coerceIn(0f, 1f)
         glEnable(GL_DEPTH_TEST)
-        glClearColor(0f, 0.6f*dayNight, 1f*dayNight, 1f*dayNight)
+        glClearColor(0f, 0.6f * dayNight, 1f * dayNight, 1f * dayNight)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
         glUniform1f(dayNightLoc, dayNight)
 
@@ -218,7 +223,7 @@ class World(val player: Player, val session: Session) {
     }
 
     fun tick() {
-        dayNightTick+=1
+        dayNightTick += 1
         player.tick()
     }
 }
