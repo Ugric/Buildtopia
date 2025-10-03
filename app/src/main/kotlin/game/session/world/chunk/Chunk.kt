@@ -41,21 +41,19 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
     val sunLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2) { 0xff.toByte() }
     val blockLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2) { 0 }
 
-    fun calculateLighting() {
-        var updated = false
-
+    fun calculateVerticalSunlight() {
         // 1. Initialize sunlight in this chunk top-down
         for (y in LENGTH - 1 downTo 0) {
             val worldY = y + index * LENGTH - chunk.ySectionsOffset * LENGTH
             for (x in 0 until LENGTH) {
                 for (z in 0 until LENGTH) {
-                    val before = sunLights[x, y, z]
                     sunLights[x, y, z] = if (blocks[x, y, z] != null) 0 else chunk.sunLights[x, worldY + 1, z]
-                    if (sunLights[x, y, z] != before) updated = true
                 }
             }
         }
+    }
 
+    fun calculateLighting() {
         // 2. BFS propagation
         val queue: ArrayDeque<Triple<Int, Int, Int>> = ArrayDeque() // store coordinates only
         val propagation = arrayOf(
@@ -103,8 +101,6 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                 queue.addLast(Triple(nx, ny, nz))
             }
         }
-
-        if (updated) chunk.getChunkSection(index - 1)?.updateMesh = true
     }
 
 
@@ -215,7 +211,6 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
 
     fun renderMesh(): Boolean {
         if (!updateMesh) return false
-        calculateLighting()
         verticesForUpload = mutableListOf<Float>()
         setVertices(verticesForUpload!!)
         updateMesh = false
@@ -397,6 +392,10 @@ class Chunk(
             val y = (i / (ChunkSection.LENGTH * ChunkSection.LENGTH)) + sectionIndex * ChunkSection.LENGTH
             blockData[x + z * ChunkSection.LENGTH + y * ChunkSection.LENGTH * ChunkSection.LENGTH]
         }, this, sectionIndex)
+    }
+
+    fun init() {
+        sections.forEach { it.calculateVerticalSunlight() }
     }
 
     fun getChunkSectionByIndex(index: Int): ChunkSection? {

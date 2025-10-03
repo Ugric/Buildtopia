@@ -4,14 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app/src/main/java/OpenSimplex2S/OpenSimplex2S.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="add day night cycle">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/App.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/App.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Block/Block.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Block/Block.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/resources/shaders/fragment.glsl" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/resources/shaders/fragment.glsl" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,18 +45,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "Ugric"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Ugric&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/Ugric/Buildtopia.git",
-    "accountId": "ed661211-7f8d-432e-83b1-f70982628276"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Ugric/Buildtopia.git&quot;,
+    &quot;accountId&quot;: &quot;cf480e3a-7ef7-48e9-9a4c-558037d16cda&quot;
   }
-}]]></component>
+}</component>
   <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$" gradleHome="$USER_HOME$/.gradle/wrapper/dists/gradle-8.14-bin/38aieal9i53h9rfe7vjup95b9/gradle-8.14" javaHome="$APPLICATION_HOME_DIR$/jbr" gradleVersion="8.14" />
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
@@ -88,7 +85,7 @@
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" value="" />
+        <option name="scriptParameters" value="--info" />
         <option name="taskDescriptions">
           <list />
         </option>
@@ -119,6 +116,19 @@
       <option name="presentableId" value="Default" />
       <updated>1759316074199</updated>
     </task>
+    <task id="LOCAL-00001" summary="add day night cycle">
+      <option name="closed" value="true" />
+      <created>1759321116341</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1759321116341</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="add day night cycle" />
+    <option name="LAST_COMMIT_MESSAGE" value="add day night cycle" />
   </component>
 </project>

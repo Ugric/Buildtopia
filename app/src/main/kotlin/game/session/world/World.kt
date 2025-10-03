@@ -71,6 +71,10 @@ class World(val player: Player, val session: Session) {
                         })
             }
         }
+    }
+
+    fun init() {
+
         startPhysics()
         startChunkRenderer()
     }

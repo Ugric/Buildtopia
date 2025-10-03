@@ -1,9 +1,7 @@
 package dev.wbell.buildtopia.app
 
 import dev.wbell.buildtopia.app.game.Game
-import org.joml.Matrix4d
 import org.joml.Matrix4f
-import org.joml.Vector3d
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL20.*
