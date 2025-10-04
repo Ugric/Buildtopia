@@ -18,6 +18,7 @@ import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL20.*
 import kotlinx.coroutines.*
 import org.joml.Matrix4f
+import java.util.PriorityQueue
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.PI
 import kotlin.math.sin
@@ -41,6 +42,7 @@ fun floorMod(a: Int, b: Int): Int {
 class World(val player: Player, val session: Session) {
     private val chunkRenderer = CoroutineScope(Dispatchers.Default)
     val chunkMeshQueue = ConcurrentLinkedQueue<() -> Unit>()
+    private val chunkRenderQueue = PriorityQueue<Pair<Chunk, Int>>(compareBy { it.second })
     private val physics = CoroutineScope(Dispatchers.Default)
     private val chunks = mutableMapOf<Long, Chunk>()
     private var isActive = true
@@ -48,12 +50,12 @@ class World(val player: Player, val session: Session) {
     var dayNightLoc = glGetUniformLocation(Game.shaderProgram, "dayNight")
     var dayNightTick = 0
 
-    init {
+    fun init() {
         val centerChunk = Vector2i(
             (player.position.x / ChunkSection.LENGTH).toInt(),
             (player.position.z / ChunkSection.LENGTH).toInt()
         )
-        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 12
+        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 32
         for (x in -renderDistance..<renderDistance) {
             for (z in -renderDistance..<renderDistance) {
 
@@ -67,48 +69,58 @@ class World(val player: Player, val session: Session) {
                             val x = i % ChunkSection.LENGTH
                             val z = (i / ChunkSection.LENGTH) % ChunkSection.LENGTH
                             val y = (i / (ChunkSection.LENGTH * ChunkSection.LENGTH)) - 4 * ChunkSection.LENGTH
-                            if (y == 0 || (y == 10 && Random.nextFloat()>0.01)) Block() else null
+                            if (y <= Random.nextInt(0, 5)) Block() else null
                         })
             }
         }
-    }
-
-    fun init() {
 
         startPhysics()
         startChunkRenderer()
     }
 
+    private fun markChunkDirty(chunk: Chunk, center: Vector2i) {
+        if (!chunk.isQueuedForRender) {
+            val dx = chunk.coords.x - center.x
+            val dz = chunk.coords.y - center.y
+            val dist2 = dx * dx + dz * dz
+            chunkRenderQueue.add(chunk to dist2)
+            chunk.isQueuedForRender = true
+        }
+    }
+
     private fun startChunkRenderer() {
         chunkRenderer.launch {
-            val tickTime = 50L // ms per tick (20 TPS)
+            val tickTime = 50L
             while (isActive) {
                 val centerChunk = Vector2i(
                     (player.position.x / ChunkSection.LENGTH).toInt(),
                     (player.position.z / ChunkSection.LENGTH).toInt()
                 )
-                val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 12
-                val chunksToUpdate = mutableListOf<Pair<Chunk, Int>>() // Pair(chunk, distance^2)
+
+                val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 32
 
                 for (dx in -renderDistance - 1..renderDistance) {
                     for (dz in -renderDistance - 1..renderDistance) {
                         val chunk = getChunk(centerChunk.x + dx, centerChunk.y + dz)
                         if (chunk != null) {
                             val dist2 = dx * dx + dz * dz
-                            chunksToUpdate.add(chunk to dist2)
+                            if (chunk.toRenderMesh()) markChunkDirty(chunk, centerChunk)
                         }
                     }
                 }
 
-// Sort by distance
-                chunksToUpdate.sortBy { it.second }
-                for ((chunk, _) in chunksToUpdate) {
+                // Process N chunks per tick
+                repeat(4) {
+                    val next = chunkRenderQueue.poll() ?: return@repeat
+                    val (chunk, _) = next
+                    chunk.isQueuedForRender = false
+
                     if (chunk.toRenderMesh()) {
                         chunk.renderMesh()
                         chunkMeshQueue.add { chunk.uploadChunkMesh() }
-                    } // main thread upload
+                    }
                 }
-                delay(tickTime)
+                if (chunkRenderQueue.isEmpty()) delay(tickTime)
             }
         }
     }
@@ -217,7 +229,7 @@ class World(val player: Player, val session: Session) {
             (player.position.x / ChunkSection.LENGTH).toInt(),
             (player.position.z / ChunkSection.LENGTH).toInt()
         )
-        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 12
+        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 32
         for (dx in -renderDistance - 1..renderDistance) {
             for (dz in -renderDistance - 1..renderDistance) {
                 val chunk = getChunk(centerChunk.x + dx, centerChunk.y + dz)

@@ -110,6 +110,7 @@ object Game {
             projLoc = glGetUniformLocation(shaderProgram, "projection")
             session.World = World(Player(Vector3d(0.0, 4.0, 0.0), 0f, 0f), session)
             session.World!!.player.world = session.World
+            session.World!!.init()
 
             // Initial projection
 

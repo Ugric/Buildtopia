@@ -4,11 +4,11 @@ import dev.wbell.buildtopia.app.game.Game
 import dev.wbell.buildtopia.app.game.session.world.World
 import dev.wbell.buildtopia.app.game.session.world.chunk.Block.Block
 import dev.wbell.buildtopia.app.game.session.world.chunk.Block.addFace
+import dev.wbell.buildtopia.app.game.session.world.chunk.ChunkSection.Companion.LENGTH
 import dev.wbell.buildtopia.app.game.session.world.floorDiv
 import dev.wbell.buildtopia.app.game.session.world.floorMod
 import org.joml.Matrix4d
 import org.joml.Vector2i
-import org.joml.Vector3i
 import org.lwjgl.glfw.GLFW.glfwGetTime
 import org.lwjgl.opengl.ARBVertexArrayObject.glBindVertexArray
 import org.lwjgl.opengl.ARBVertexArrayObject.glGenVertexArrays
@@ -38,22 +38,10 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         const val SIZE = LENGTH * LENGTH * LENGTH
     }
 
-    val sunLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2) { 0xff.toByte() }
+    val sunLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2) { 0 }
     val blockLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2) { 0 }
 
-    fun calculateVerticalSunlight() {
-        // 1. Initialize sunlight in this chunk top-down
-        for (y in LENGTH - 1 downTo 0) {
-            val worldY = y + index * LENGTH - chunk.ySectionsOffset * LENGTH
-            for (x in 0 until LENGTH) {
-                for (z in 0 until LENGTH) {
-                    sunLights[x, y, z] = if (blocks[x, y, z] != null) 0 else chunk.sunLights[x, worldY + 1, z]
-                }
-            }
-        }
-    }
-
-    fun calculateLighting() {
+    fun calculateSunLight() {
         // 2. BFS propagation
         val queue: ArrayDeque<Triple<Int, Int, Int>> = ArrayDeque() // store coordinates only
         val propagation = arrayOf(
@@ -84,13 +72,17 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         while (queue.isNotEmpty()) {
             val (x, y, z) = queue.removeFirst()
             val currentLight = chunk.world.sunLights[x, y, z]
-            val newLightLevel = currentLight - 1
-            if (newLightLevel <= 0) continue
 
             for (dir in propagation) {
                 val nx = x + dir[0]
                 val ny = y + dir[1]
                 val nz = z + dir[2]
+                var newLightLevel = currentLight - 1
+
+                if (dir[1] == -1) {
+                    newLightLevel = currentLight
+                }
+                if (newLightLevel <= 0) continue
 
                 // skip if block is solid or light is already >= newLightLevel
                 if (chunk.world.blocks[nx, ny, nz] != null) continue
@@ -110,25 +102,27 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
             val byteIndex = index / 2
             val high = index % 2 == 0
             val v = value.coerceIn(0, 15)
-
+            val oldData = get(x,y,z)
             if (high) {
                 sunLightData[byteIndex] = ((v shl 4) or (sunLightData[byteIndex].toInt() and 0x0F)).toByte()
             } else {
                 sunLightData[byteIndex] = ((sunLightData[byteIndex].toInt() and 0xF0) or v).toByte()
             }
-            updateMesh = true
             if (x == 0) {
                 chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)?.getChunkSectionByIndex(index)?.updateMesh =
                     true
             }
-            if (z == 0) chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)
-                ?.getChunkSectionByIndex(index)?.updateMesh = true
-            if (x == LENGTH - 1) chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)
-                ?.getChunkSectionByIndex(index)?.updateMesh = true
-            if (z == LENGTH - 1) chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)
-                ?.getChunkSectionByIndex(index)?.updateMesh = true
-            if (y == 0) chunk.getChunkSectionByIndex(index - 1)?.updateMesh = true
-            if (y == LENGTH - 1) chunk.getChunkSectionByIndex(index + 1)?.updateMesh = true
+            if (oldData != get(x,y,z)) {
+                updateMesh = true
+                if (z == 0) chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)
+                    ?.getChunkSectionByIndex(index)?.updateMesh = true
+                if (x == LENGTH - 1) chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)
+                    ?.getChunkSectionByIndex(index)?.updateMesh = true
+                if (z == LENGTH - 1) chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)
+                    ?.getChunkSectionByIndex(index)?.updateMesh = true
+                if (y == 0) chunk.getChunkSectionByIndex(index - 1)?.updateMesh = true
+                if (y == LENGTH - 1) chunk.getChunkSectionByIndex(index + 1)?.updateMesh = true
+            }
         }
 
         override operator fun get(x: Int, y: Int, z: Int): Int {
@@ -393,9 +387,17 @@ class Chunk(
             blockData[x + z * ChunkSection.LENGTH + y * ChunkSection.LENGTH * ChunkSection.LENGTH]
         }, this, sectionIndex)
     }
-
-    fun init() {
-        sections.forEach { it.calculateVerticalSunlight() }
+    var verticalSunCalculated = false
+    fun initVerticalSun() {
+        for (x in 0 until LENGTH) {
+            for (z in 0 until LENGTH) {
+                for (y in LENGTH - 1 downTo 0) {
+                    if (blocks[x,y,z] != null) break
+                    sunLights[x,y,z] = 15
+                }
+            }
+        }
+        verticalSunCalculated = true
     }
 
     fun getChunkSectionByIndex(index: Int): ChunkSection? {
@@ -419,12 +421,6 @@ class Chunk(
         }
     }
 
-    fun initializeSunlight() {
-        for (sectionIndex in (numberOfSections - 1) downTo 0) {
-            getChunkSection(sectionIndex)?.calculateLighting()
-        }
-    }
-
     val sunLights = object : LightAccessor {
         override operator fun set(x: Int, y: Int, z: Int, value: Int) {
             getChunkSection(y)?.sunLights[x, floorMod(y, ChunkSection.LENGTH), z] = value
@@ -445,6 +441,8 @@ class Chunk(
         }
     }
 
+    var isQueuedForRender = false
+
     fun toRenderMesh(): Boolean {
         var toRender = false
         for (i in 0..<numberOfSections) {
@@ -454,9 +452,14 @@ class Chunk(
     }
 
     fun renderMesh(): Boolean {
+        initVerticalSun()
         var hasRendered = false
-        for (i in 0..<numberOfSections) {
-            if (sections[i].renderMesh()) hasRendered = true
+        for (i in (numberOfSections - 1) downTo 0) {
+            if (sections[i].updateMesh) {
+                sections[i].calculateSunLight()
+                sections[i].renderMesh()
+                hasRendered = true
+            }
         }
         return hasRendered
 //        if (meshExists) {

@@ -53,12 +53,12 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
     fun getNearbyBlockBoxes(bb: AABB): List<AABB> {
         val boxes = mutableListOf<AABB>()
 
-        val minX = floor(bb.minX - 0.5).toInt()
-        val minY = floor(bb.minY).toInt()
-        val minZ = floor(bb.minZ - 0.5).toInt()
-        val maxX = floor(bb.maxX + 0.5).toInt()
-        val maxY = floor(bb.maxY).toInt()
-        val maxZ = floor(bb.maxZ + 0.5).toInt()
+        val minX = floor(bb.minX - 2.0).toInt()
+        val minY = floor(bb.minY - 2.0).toInt()
+        val minZ = floor(bb.minZ - 2.0).toInt()
+        val maxX = floor(bb.maxX + 2.0).toInt()
+        val maxY = floor(bb.maxY + 2.0).toInt()
+        val maxZ = floor(bb.maxZ + 2.0).toInt()
 
         for (x in minX..maxX) {
             for (y in minY..maxY) {
@@ -176,11 +176,13 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
     }
 
     fun getCamera(alpha: Double): Camera {
-        return Camera(Vector3d(
-            lerp(lastPosition.x, position.x, alpha),
-            lerp(lastPosition.y, position.y, alpha)+1,
-            lerp(lastPosition.z, position.z, alpha)
-        ), pitch, yaw, 0f)
+        return Camera(
+            Vector3d(
+                lerp(lastPosition.x, position.x, alpha),
+                lerp(lastPosition.y, position.y, alpha) + 1,
+                lerp(lastPosition.z, position.z, alpha)
+            ), pitch, yaw, 0f
+        )
     }
 
     private fun lerp(a: Double, b: Double, t: Double): Double {
