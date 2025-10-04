@@ -163,7 +163,7 @@ object Game {
     }
 
     fun render(deltaTime: Double): Boolean {
-        session.World?.render(deltaTime)
+        session.render(deltaTime)
         return true
     }
 }

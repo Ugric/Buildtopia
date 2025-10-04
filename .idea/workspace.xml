@@ -4,12 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="">
+    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="finish working sunlight system with light flooding with vertical lighting to improve speed">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/Game.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/Game.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/session.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/session.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/player/Player.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/player/Player.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -118,6 +117,19 @@
       <option name="presentableId" value="Default" />
       <updated>1759316074199</updated>
     </task>
+    <task id="LOCAL-00001" summary="finish working sunlight system with light flooding with vertical lighting to improve speed">
+      <option name="closed" value="true" />
+      <created>1759549009134</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1759549009134</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="finish working sunlight system with light flooding with vertical lighting to improve speed" />
+    <option name="LAST_COMMIT_MESSAGE" value="finish working sunlight system with light flooding with vertical lighting to improve speed" />
   </component>
 </project>

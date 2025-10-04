@@ -1,7 +1,6 @@
 package dev.wbell.buildtopia.app.game.session.world
 
 import dev.wbell.buildtopia.app.game.Game
-import dev.wbell.buildtopia.app.game.Game.window
 import dev.wbell.buildtopia.app.game.camera.Camera
 import dev.wbell.buildtopia.app.game.session.Session
 import dev.wbell.buildtopia.app.game.session.world.chunk.Block.Block
@@ -21,7 +20,6 @@ import org.joml.Matrix4f
 import java.util.PriorityQueue
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.PI
-import kotlin.math.sin
 import kotlin.random.Random
 
 fun floorDiv(a: Int, b: Int): Int {
@@ -103,7 +101,6 @@ class World(val player: Player, val session: Session) {
                     for (dz in -renderDistance - 1..renderDistance) {
                         val chunk = getChunk(centerChunk.x + dx, centerChunk.y + dz)
                         if (chunk != null) {
-                            val dist2 = dx * dx + dz * dz
                             if (chunk.toRenderMesh()) markChunkDirty(chunk, centerChunk)
                         }
                     }
@@ -205,7 +202,7 @@ class World(val player: Player, val session: Session) {
 
     }
 
-    fun render(deltaTime: Double) {
+    fun render() {
         while (chunkMeshQueue.isNotEmpty()) {
             chunkMeshQueue.poll()?.invoke()
         }
