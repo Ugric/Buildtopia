@@ -4,19 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="add render for the specific session instead of directly calling world">
-      <change afterPath="$PROJECT_DIR$/.idea/dictionaries/project.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/App.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/App.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/Game.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/Game.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/camera/Camera.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/camera/Camera.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/player/Player.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/player/Player.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/settings/settings.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/settings/settings.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/resources/shaders/fragment.glsl" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/resources/assets/Blocktopia/shaders/core/terrain.fsh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/resources/shaders/vertex.glsl" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/resources/assets/Blocktopia/shaders/core/terrain.vsh" afterDir="false" />
+    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="add noise based terrain, with caves, and better mesh render times.">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -148,12 +137,21 @@
       <option name="project" value="LOCAL" />
       <updated>1759549824770</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="add noise based terrain, with caves, and better mesh render times.">
+      <option name="closed" value="true" />
+      <created>1759638321889</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1759638321889</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="finish working sunlight system with light flooding with vertical lighting to improve speed" />
     <MESSAGE value="add render for the specific session instead of directly calling world" />
-    <option name="LAST_COMMIT_MESSAGE" value="add render for the specific session instead of directly calling world" />
+    <MESSAGE value="add noise based terrain, with caves, and better mesh render times." />
+    <option name="LAST_COMMIT_MESSAGE" value="add noise based terrain, with caves, and better mesh render times." />
   </component>
 </project>
