@@ -31,23 +31,6 @@ fun createShader(vertexSrc: String, fragmentSrc: String): Int {
     return program
 }
 
-fun updateProjection(shaderProgram: Int, width: Int, height: Int) {
-    glViewport(0, 0, width, height)
-
-    val fov = 90f
-    val aspect = width.toFloat() / height
-    val near = 0.1f
-    val far = 10000f
-
-    val projection = Matrix4f().perspective(Math.toRadians(fov.toDouble()).toFloat(), aspect, near, far)
-    val projBuffer = FloatArray(16)
-    projection.get(projBuffer)
-
-    val projLoc = glGetUniformLocation(shaderProgram, "projection")
-    glUseProgram(shaderProgram)
-    glUniformMatrix4fv(projLoc, false, projBuffer)
-}
-
 fun main() {
 
 

@@ -20,6 +20,7 @@ import org.lwjgl.opengl.GL15.glGenBuffers
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.*
+import java.util.Collections
 
 
 interface BlockAccessor {
@@ -41,7 +42,10 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
     val sunLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2) { 0 }
     val blockLightData = ByteArray(LENGTH * LENGTH * LENGTH / 2) { 0 }
 
+    var sunlightDataCalculated = false
+
     fun calculateSunLight() {
+        if (sunlightDataCalculated) return
         // 2. BFS propagation
         val queue: ArrayDeque<Triple<Int, Int, Int>> = ArrayDeque() // store coordinates only
         val propagation = arrayOf(
@@ -93,6 +97,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                 queue.addLast(Triple(nx, ny, nz))
             }
         }
+        sunlightDataCalculated = true
     }
 
 
@@ -102,7 +107,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
             val byteIndex = index / 2
             val high = index % 2 == 0
             val v = value.coerceIn(0, 15)
-            val oldData = get(x,y,z)
+            val oldData = get(x, y, z)
             if (high) {
                 sunLightData[byteIndex] = ((v shl 4) or (sunLightData[byteIndex].toInt() and 0x0F)).toByte()
             } else {
@@ -112,9 +117,12 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                 chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)?.getChunkSectionByIndex(index)?.updateMesh =
                     true
             }
-            if (oldData != get(x,y,z)) {
+            if (oldData != get(x, y, z)) {
                 updateMesh = true
+                sunlightDataCalculated = false
                 if (z == 0) chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)
+                    ?.getChunkSectionByIndex(index)?.updateMesh = true
+                if (x == 0) chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)
                     ?.getChunkSectionByIndex(index)?.updateMesh = true
                 if (x == LENGTH - 1) chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)
                     ?.getChunkSectionByIndex(index)?.updateMesh = true
@@ -201,29 +209,31 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
     var vbo: Int = 0
     var timeMeshCreated = 0.0
     var updateMesh: Boolean = true
-    var verticesForUpload: MutableList<Float>? = null
+    var verticesForUpload = Collections.synchronizedList(mutableListOf<Float>())
+    var verticesReadyForUpload = false
 
     fun renderMesh(): Boolean {
         if (!updateMesh) return false
-        verticesForUpload = mutableListOf<Float>()
-        setVertices(verticesForUpload!!)
+        verticesForUpload.clear()
+        setVertices(verticesForUpload)
         updateMesh = false
+        verticesReadyForUpload = true
         return true
     }
 
     fun uploadMesh() {
-        if (verticesForUpload == null) return
+        if (!verticesReadyForUpload) return
 
-        val newVertexCount = verticesForUpload!!.size
+        val newVertexCount = verticesForUpload.size
 
-        if (verticesForUpload!!.isEmpty()) {
+        if (verticesForUpload.isEmpty()) {
             // If no vertices, clear mesh
             if (meshExists) {
                 glDeleteBuffers(vbo)
                 glDeleteVertexArrays(vao)
             }
             meshExists = false
-            verticesForUpload = null
+            verticesReadyForUpload = false
             timeMeshCreated = glfwGetTime()
             vao = 0
             vbo = 0
@@ -261,16 +271,21 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
         if (newVertexCount > vaoSize) {
             // Reallocate if new data won't fit
-            glBufferData(GL_ARRAY_BUFFER, verticesForUpload!!.toFloatArray(), GL_DYNAMIC_DRAW)
+            synchronized(verticesForUpload) {
+                glBufferData(GL_ARRAY_BUFFER, verticesForUpload!!.toFloatArray(), GL_DYNAMIC_DRAW)
+            }
         } else {
             // Just update existing buffer
-            glBufferSubData(GL_ARRAY_BUFFER, 0, verticesForUpload!!.toFloatArray())
+            synchronized(verticesForUpload!!) {
+                glBufferSubData(GL_ARRAY_BUFFER, 0, verticesForUpload!!.toFloatArray())
+            }
         }
         glBindBuffer(GL_ARRAY_BUFFER, 0)
 
         vaoSize = newVertexCount
         updateMesh = false
-        verticesForUpload = null
+        verticesReadyForUpload = false
+        verticesForUpload.clear()
         timeMeshCreated = glfwGetTime()
     }
 
@@ -370,6 +385,15 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
             }
         }
     }
+
+    fun unload() {
+        if (meshExists) {
+            glDeleteBuffers(vbo)
+            glDeleteVertexArrays(vao)
+            meshExists = false
+        }
+        updateMesh = false
+    }
 }
 
 class Chunk(
@@ -377,73 +401,95 @@ class Chunk(
     val coords: Vector2i,
     val numberOfSections: Int,
     val ySectionsOffset: Int,
-    val blockData: Array<Block?>
+    var blockData: Array<Block?>?,
+    val peak: Int
 ) {
     var sections: Array<ChunkSection> = Array(numberOfSections) { sectionIndex ->
         ChunkSection(Array(ChunkSection.SIZE) { i ->
-            val x = i % ChunkSection.LENGTH
-            val z = (i / ChunkSection.LENGTH) % ChunkSection.LENGTH
-            val y = (i / (ChunkSection.LENGTH * ChunkSection.LENGTH)) + sectionIndex * ChunkSection.LENGTH
-            blockData[x + z * ChunkSection.LENGTH + y * ChunkSection.LENGTH * ChunkSection.LENGTH]
+            val x = i % LENGTH
+            val z = (i / LENGTH) % LENGTH
+            val y = (i / (LENGTH * LENGTH)) + sectionIndex * LENGTH
+            blockData!![x + z * LENGTH + y * LENGTH * LENGTH]
         }, this, sectionIndex)
     }
+
+    init {
+        blockData = null
+    }
+
+    var loaded = true
     var verticalSunCalculated = false
     fun initVerticalSun() {
+        if (!loaded) return
+
+        val topY = (numberOfSections - ySectionsOffset) * LENGTH - 1
+        val bottomY = peak + 1
+
         for (x in 0 until LENGTH) {
             for (z in 0 until LENGTH) {
-                for (y in LENGTH - 1 downTo 0) {
-                    if (blocks[x,y,z] != null) break
-                    sunLights[x,y,z] = 15
+                for (y in topY downTo bottomY) {
+                    sunLights[x, y, z] = 15
+                    if (peak < y - LENGTH) getChunkSection(y)?.sunlightDataCalculated = true
                 }
             }
         }
+
         verticalSunCalculated = true
     }
 
     fun getChunkSectionByIndex(index: Int): ChunkSection? {
+        if (!loaded) return null
         if (index !in 0..<numberOfSections) return null
         return sections[index]
     }
 
     fun getChunkSection(y: Int): ChunkSection? {
-        val sectionIndex = floorDiv((y + ySectionsOffset * ChunkSection.LENGTH), ChunkSection.LENGTH)
+        if (!loaded) return null
+        val sectionIndex = floorDiv((y + ySectionsOffset * LENGTH), LENGTH)
         if (sectionIndex !in 0..<numberOfSections) return null
         return sections[sectionIndex]
     }
 
     val blocks = object : BlockAccessor {
         override operator fun get(x: Int, y: Int, z: Int): Block? {
-            return getChunkSection(y)?.blocks[x, floorMod(y, ChunkSection.LENGTH), z]
+            if (!loaded) return null
+            return getChunkSection(y)?.blocks[x, floorMod(y, LENGTH), z]
         }
 
         override operator fun set(x: Int, y: Int, z: Int, value: Block?) {
-            getChunkSection(y)?.blocks[x, floorMod(y, ChunkSection.LENGTH), z] = value
+            if (!loaded) return
+            getChunkSection(y)?.blocks[x, floorMod(y, LENGTH), z] = value
         }
     }
 
     val sunLights = object : LightAccessor {
         override operator fun set(x: Int, y: Int, z: Int, value: Int) {
-            getChunkSection(y)?.sunLights[x, floorMod(y, ChunkSection.LENGTH), z] = value
+            if (!loaded) return
+            getChunkSection(y)?.sunLights[x, floorMod(y, LENGTH), z] = value
         }
 
         override operator fun get(x: Int, y: Int, z: Int): Int {
-            return getChunkSection(y)?.sunLights[x, floorMod(y, ChunkSection.LENGTH), z] ?: if (y > 0) 15 else 0
+            if (!loaded) return if (y > 0) 15 else 0
+            return getChunkSection(y)?.sunLights[x, floorMod(y, LENGTH), z] ?: if (y > 0) 15 else 0
         }
     }
 
     val blockLights = object : LightAccessor {
         override operator fun set(x: Int, y: Int, z: Int, value: Int) {
-            getChunkSection(y)?.blockLights[x, floorMod(y, ChunkSection.LENGTH), z] = value
+            if (!loaded) return
+            getChunkSection(y)?.blockLights[x, floorMod(y, LENGTH), z] = value
         }
 
         override operator fun get(x: Int, y: Int, z: Int): Int {
-            return getChunkSection(y)?.blockLights[x, floorMod(y, ChunkSection.LENGTH), z] ?: 0
+            if (!loaded) return 0
+            return getChunkSection(y)?.blockLights[x, floorMod(y, LENGTH), z] ?: 0
         }
     }
 
     var isQueuedForRender = false
 
     fun toRenderMesh(): Boolean {
+        if (!loaded) return false
         var toRender = false
         for (i in 0..<numberOfSections) {
             if (sections[i].updateMesh) toRender = true
@@ -452,6 +498,7 @@ class Chunk(
     }
 
     fun renderMesh(): Boolean {
+        if (!loaded) return false
         initVerticalSun()
         var hasRendered = false
         for (i in (numberOfSections - 1) downTo 0) {
@@ -486,6 +533,7 @@ class Chunk(
     }
 
     fun uploadChunkMesh() {
+        if (!loaded) return
         for (i in 0..<numberOfSections) {
             sections[i].uploadMesh()
         }
@@ -493,10 +541,14 @@ class Chunk(
 
 
     fun render(alpha: Double) {
+        if (!loaded) return
         for (i in 0..<numberOfSections) {
             sections[i].render(alpha)
         }
     }
 
-    fun unload() {}
+    fun unload() {
+        sections.forEach { it.unload() }
+        loaded = false
+    }
 }

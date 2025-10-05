@@ -3,6 +3,8 @@ package dev.wbell.buildtopia.app.game.session.world.player
 import dev.wbell.buildtopia.app.game.Game
 import dev.wbell.buildtopia.app.game.camera.Camera
 import dev.wbell.buildtopia.app.game.session.world.World
+import dev.wbell.buildtopia.app.game.settings.SettingKey
+import dev.wbell.buildtopia.app.game.settings.Settings
 import org.joml.Matrix4d
 import org.joml.Vector2d
 import org.joml.Vector2f
@@ -181,7 +183,7 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
                 lerp(lastPosition.x, position.x, alpha),
                 lerp(lastPosition.y, position.y, alpha) + 1,
                 lerp(lastPosition.z, position.z, alpha)
-            ), pitch, yaw, 0f
+            ), pitch, yaw, 0f, (Settings[SettingKey.FOV]?:90).toFloat()
         )
     }
 

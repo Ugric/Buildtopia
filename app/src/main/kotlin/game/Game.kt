@@ -3,10 +3,9 @@ package dev.wbell.buildtopia.app.game
 import dev.wbell.buildtopia.app.createShader
 import dev.wbell.buildtopia.app.game.session.Session
 import dev.wbell.buildtopia.app.game.session.world.World
-import dev.wbell.buildtopia.app.game.session.world.chunk.ChunkSection
 import dev.wbell.buildtopia.app.game.session.world.player.Player
 import dev.wbell.buildtopia.app.loadResource
-import dev.wbell.buildtopia.app.updateProjection
+import org.joml.Matrix4f
 import org.joml.Vector3d
 import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW.*
@@ -15,10 +14,10 @@ import org.lwjgl.opengl.GL20.glGetUniformLocation
 import org.lwjgl.opengl.GL20.glUseProgram
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.opengl.GL13.*
+import org.lwjgl.opengl.GL20.glUniformMatrix4fv
 import org.lwjgl.stb.STBImage
 import java.nio.IntBuffer
 import kotlin.math.PI
-import kotlin.random.Random
 
 
 fun loadTexture(path: String): Int {
@@ -75,6 +74,22 @@ object Game {
     var viewLoc = 0
     var projLoc = 0
 
+    fun updateFov(fov: Float) {
+        glViewport(0, 0, width, height)
+
+        val aspect = width.toFloat() / height
+        val near = 0.1f
+        val far = 10000f
+
+        val projection = Matrix4f().perspective(Math.toRadians(fov.toDouble()).toFloat(), aspect, near, far)
+        val projBuffer = FloatArray(16)
+        projection.get(projBuffer)
+
+        val projLoc = glGetUniformLocation(shaderProgram, "projection")
+        glUseProgram(shaderProgram)
+        glUniformMatrix4fv(projLoc, false, projBuffer)
+    }
+
     fun init() {
         // Initialize GLFW
         if (!glfwInit()) throw RuntimeException("Failed to initialize GLFW")
@@ -95,12 +110,12 @@ object Game {
             glFrontFace(GL_CCW)          // counter-clockwise triangles are front-facing
             glDepthFunc(GL_LESS)
 
-            textureId = loadTexture("/resource_pack/textures/block/cobblestone.png")
+            textureId = loadTexture("/assets/Blocktopia/textures/block/cobblestone.png")
 
             // Simple shaders
-            val vertexShaderSrc = loadResource("/shaders/vertex.glsl")
+            val vertexShaderSrc = loadResource("/assets/Blocktopia/shaders/core/terrain.vsh")
 
-            val fragmentShaderSrc = loadResource("/shaders/fragment.glsl")
+            val fragmentShaderSrc = loadResource("/assets/Blocktopia/shaders/core/terrain.fsh")
 
             shaderProgram = createShader(vertexShaderSrc, fragmentShaderSrc)
             glUseProgram(shaderProgram)
@@ -108,20 +123,9 @@ object Game {
             modelLoc = glGetUniformLocation(shaderProgram, "model")
             viewLoc = glGetUniformLocation(shaderProgram, "view")
             projLoc = glGetUniformLocation(shaderProgram, "projection")
-            session.World = World(Player(Vector3d(0.0, 4.0, 0.0), 0f, 0f), session)
+            session.World = World(Player(Vector3d(0.0, 400.0, 0.0), 0f, 0f), session)
             session.World!!.player.world = session.World
             session.World!!.init()
-
-            // Initial projection
-
-            // GLFW callback for resizing
-            glfwSetFramebufferSizeCallback(window) { _, w, h ->
-                width = w
-                height = h
-                updateProjection(shaderProgram, w, h)
-            }
-
-            updateProjection(shaderProgram, width, height)
 
 // Initially disable the cursor
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
@@ -163,6 +167,11 @@ object Game {
     }
 
     fun render(deltaTime: Double): Boolean {
+        val widthBuffer = IntArray(1)
+        val heightBuffer = IntArray(1)
+        glfwGetFramebufferSize(window!!, widthBuffer, heightBuffer)
+        width = widthBuffer[0]
+        height = heightBuffer[0]
         session.render(deltaTime)
         return true
     }

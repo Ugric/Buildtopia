@@ -6,6 +6,7 @@ class Camera(
     val position: Vector3d,
     var pitch: Float,
     var yaw: Float,
-    var roll: Float
+    var roll: Float,
+    var fov: Float
 ) {
 }

@@ -10,12 +10,13 @@ sealed class SettingKey<T>(val key: String) {
 object Settings {
     private val data = mutableMapOf<SettingKey<*>, Any>()
 
-    fun <T : Any> set(key: SettingKey<T>, value: T) {
+    @Suppress("UNCHECKED_CAST")
+    operator fun <T : Any> set(key: SettingKey<T>, value: T) {
         data[key] = value
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun <T : Any> get(key: SettingKey<T>): T? {
+    operator fun <T : Any> get(key: SettingKey<T>): T? {
         val value = data[key]
         return value as T?
     }
