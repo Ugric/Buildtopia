@@ -42,7 +42,8 @@ fun floorMod(a: Int, b: Int): Int {
 class World(val player: Player, val session: Session) {
     private val chunkRenderer = CoroutineScope(Dispatchers.Default)
     val chunkMeshQueue = ConcurrentLinkedQueue<() -> Unit>()
-    private val chunkRenderQueue = PriorityBlockingQueue<Pair<Chunk, Int>>(11, compareBy { it.second })
+    private val chunkRenderQueue = PriorityQueue<Pair<Chunk, Int>>(compareBy { it.second })
+    private val chunkUpdateRenderQueue = PriorityQueue<Pair<Chunk, Int>>(compareBy { it.second })
     private val physics = CoroutineScope(Dispatchers.Default)
     private val chunks = ConcurrentHashMap<Long, Chunk>()
     private val toLoadChunks = ConcurrentHashMap<Long, Vector2i>()
@@ -56,8 +57,8 @@ class World(val player: Player, val session: Session) {
     fun init() {
         startPhysics()
         startChunkRenderer()
+        startChunkUpdateRenderer()
         startChunkLoaderRenderer()
-        startChunkRendererChild()
     }
 
     private fun markChunkDirty(chunk: Chunk) {
@@ -66,6 +67,16 @@ class World(val player: Player, val session: Session) {
             val dz = chunk.coords.y
             val dist2 = dx * dx + dz * dz
             chunkRenderQueue.add(chunk to dist2)
+            chunk.isQueuedForRender = true
+        }
+    }
+
+    private fun markChunkDirtyUpdate(chunk: Chunk) {
+        if (!chunk.isQueuedForRender) {
+            val dx = chunk.coords.x
+            val dz = chunk.coords.y
+            val dist2 = dx * dx + dz * dz
+            chunkUpdateRenderQueue.add(chunk to dist2)
             chunk.isQueuedForRender = true
         }
     }
@@ -150,12 +161,15 @@ class World(val player: Player, val session: Session) {
         }
     }
 
-    private fun startChunkRendererChild() {
+    private fun startChunkRenderer() {
         chunkRenderer.launch {
             val tickTime = 50L
             while (isActive) {
-                while (chunkRenderQueue.isNotEmpty()) {
-                    val next = chunkRenderQueue.poll()
+                for (chunk in chunks.values) {
+                    if (chunk.toRenderMesh()) markChunkDirty(chunk)
+                }
+                repeat(4) {
+                    val next = chunkRenderQueue.poll() ?: return@repeat
                     val (chunk, _) = next
                     chunk.isQueuedForRender = false
 
@@ -164,19 +178,29 @@ class World(val player: Player, val session: Session) {
                         chunkMeshQueue.add { chunk.uploadChunkMesh() }
                     }
                 }
-                delay(tickTime)
+                if (chunkRenderQueue.isEmpty()) delay(tickTime)
             }
         }
     }
 
-    private fun startChunkRenderer() {
+    private fun startChunkUpdateRenderer() {
         chunkRenderer.launch {
             val tickTime = 50L
             while (isActive) {
                 for (chunk in chunks.values) {
-                    if (chunk.toRenderMesh()) markChunkDirty(chunk)
+                    if (chunk.toUpdateMesh()) markChunkDirtyUpdate(chunk)
                 }
-                if (chunkRenderQueue.isEmpty()) delay(tickTime)
+                repeat(4) {
+                    val next = chunkUpdateRenderQueue.poll() ?: return@repeat
+                    val (chunk, _) = next
+                    chunk.isQueuedForRender = false
+
+                    if (chunk.toUpdateMesh()) {
+                        chunk.renderMesh()
+                        chunkMeshQueue.add { chunk.uploadChunkMesh() }
+                    }
+                }
+                if (chunkUpdateRenderQueue.isEmpty()) delay(tickTime)
             }
         }
     }

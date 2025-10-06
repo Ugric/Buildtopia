@@ -5,18 +5,12 @@ import dev.wbell.buildtopia.app.game.camera.Camera
 import dev.wbell.buildtopia.app.game.session.world.World
 import dev.wbell.buildtopia.app.game.settings.SettingKey
 import dev.wbell.buildtopia.app.game.settings.Settings
-import org.joml.Matrix4d
 import org.joml.Vector2d
 import org.joml.Vector2f
 import org.joml.Vector3d
 import org.lwjgl.glfw.GLFW.*
-import org.lwjgl.glfw.GLFW.glfwGetKey
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.floor
-import kotlin.math.pow
-import kotlin.math.sin
+import kotlin.math.*
+import kotlin.random.Random
 
 
 data class AABB(
@@ -37,6 +31,8 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
     val velocity = Vector3d(0.0, 0.0, 0.0)
 
     private var isOnGround = false
+    private var isSprinting = false
+    var fovModifierCurrent = 1.0
 
     // Store last and current positions for interpolation
     private val lastPosition = Vector3d(position)
@@ -90,6 +86,11 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
         val movement = Vector2d(0.0, 0.0)
         if (glfwGetKey(Game.window!!, GLFW_KEY_W) == GLFW_PRESS) {
             movement.x = 1.0
+            if (glfwGetKey(Game.window!!, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+                isSprinting=true
+            }
+        } else {
+            isSprinting=false
         }
         if (glfwGetKey(Game.window!!, GLFW_KEY_S) == GLFW_PRESS) {
             movement.x = -1.0
@@ -104,7 +105,7 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
             movement.normalize()
         }
         movement.mul(0.1)
-        if (glfwGetKey(Game.window!!, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+        if (isSprinting) {
             movement.mul(1.3)
         }
         velocity.x =
@@ -121,6 +122,9 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
         moveAxis(velocity.x, 0.0, 0.0) // move along X
         moveAxis(0.0, velocity.y, 0.0) // move along Y
         moveAxis(0.0, 0.0, velocity.z) // move along Z
+        if (glfwGetKey(Game.window!!, GLFW_KEY_W) == GLFW_PRESS && glfwGetKey(Game.window!!, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+            isSprinting = true
+        }
     }
 
 
@@ -174,16 +178,28 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
             if (!collidedX) position.x += stepX
             if (!collidedY) position.y += stepY
             if (!collidedZ) position.z += stepZ
+            if ((collidedX || collidedZ) && dx*dx+dz*dz > 0.01) isSprinting = false
         }
     }
 
     fun getCamera(alpha: Double): Camera {
+        val targetFovModifier = if (isSprinting) 1.1 else 1.0
+
+        // gradually move current toward target, just like Minecraft
+        fovModifierCurrent += (targetFovModifier - fovModifierCurrent) * 0.1
+
+        val interpolatedFovModifier = fovModifierCurrent // already smoothed
+
         return Camera(
             Vector3d(
                 lerp(lastPosition.x, position.x, alpha),
                 lerp(lastPosition.y, position.y, alpha) + 1,
                 lerp(lastPosition.z, position.z, alpha)
-            ), pitch, yaw, 0f, (Settings[SettingKey.FOV]?:90).toFloat()
+            ),
+            pitch,
+            yaw,
+            0f,
+            ((Settings[SettingKey.FOV] ?: 90).toFloat() * interpolatedFovModifier.toFloat())
         )
     }
 

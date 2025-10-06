@@ -44,8 +44,8 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
 
     var sunlightDataCalculated = false
 
-    fun calculateSunLight() {
-        if (sunlightDataCalculated) return
+    fun calculateSunLight(): Boolean {
+        if (sunlightDataCalculated) return false
         // 2. BFS propagation
         val queue: ArrayDeque<Triple<Int, Int, Int>> = ArrayDeque() // store coordinates only
         val propagation = arrayOf(
@@ -58,18 +58,31 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         )
 
         // Seed the queue with all blocks that have sunlight > 1
+        var blocked = Array(LENGTH*LENGTH){1}
+        var toBreak = false
         for (y in LENGTH - 1 downTo 0) {
             val worldY = y + index * LENGTH - chunk.ySectionsOffset * LENGTH
             for (x in 0 until LENGTH) {
                 for (z in 0 until LENGTH) {
+                    val posInBlocked = x+z*LENGTH
+                    if (blocked[posInBlocked]==0) continue
                     val worldX = x + chunk.coords.x * LENGTH
                     val worldZ = z + chunk.coords.y * LENGTH
-                    val light = chunk.world.sunLights[worldX, worldY, worldZ]
+                    val light = sunLights[x, y, z]
+                    if (blocks[x,y,z] != null) {
+                        blocked[posInBlocked] = 0
+                        if (blocked.sum()==0) {
+                            toBreak = true
+                            break
+                        }
+                    }
                     if (light > 1) {
                         queue.addLast(Triple(worldX, worldY, worldZ))
                     }
                 }
+                if (toBreak) break
             }
+            if (toBreak) break
         }
 
         // BFS
@@ -98,6 +111,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
             }
         }
         sunlightDataCalculated = true
+        return toBreak
     }
 
 
@@ -117,19 +131,163 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                 chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)?.getChunkSectionByIndex(index)?.updateMesh =
                     true
             }
-            if (oldData != get(x, y, z)) {
+            if (oldData != v  || !sunlightDataCalculated) {
                 updateMesh = true
                 sunlightDataCalculated = false
-                if (z == 0) chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)
-                    ?.getChunkSectionByIndex(index)?.updateMesh = true
-                if (x == 0) chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)
-                    ?.getChunkSectionByIndex(index)?.updateMesh = true
-                if (x == LENGTH - 1) chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)
-                    ?.getChunkSectionByIndex(index)?.updateMesh = true
-                if (z == LENGTH - 1) chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)
-                    ?.getChunkSectionByIndex(index)?.updateMesh = true
-                if (y == 0) chunk.getChunkSectionByIndex(index - 1)?.updateMesh = true
-                if (y == LENGTH - 1) chunk.getChunkSectionByIndex(index + 1)?.updateMesh = true
+                var c: ChunkSection? = null
+                if (z == 0) {
+                    c = chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)
+                        ?.getChunkSectionByIndex(index)
+                    c?.updateMesh = true
+                    c?.sunlightDataCalculated = false
+                    if (x == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (x == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                }
+                if (x == 0) {
+                    c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)
+                        ?.getChunkSectionByIndex(index)
+                    c?.updateMesh = true
+                    c?.sunlightDataCalculated = false
+                    if (z == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                }
+                if (x == LENGTH - 1) {
+                    c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)
+                        ?.getChunkSectionByIndex(index)
+                    if (z == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                }
+                if (z == LENGTH - 1) {
+                    c = chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)
+                        ?.getChunkSectionByIndex(index)
+                    c?.updateMesh = true
+                    c?.sunlightDataCalculated = false
+                    if (x == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (x == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                }
+                if (y == 0) {
+                    c = chunk.getChunkSectionByIndex(index - 1)
+                    c?.updateMesh = true
+                    c?.sunlightDataCalculated = false
+                    if (z == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index - 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (x == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)
+                            ?.getChunkSectionByIndex(index - 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index - 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (x == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)
+                            ?.getChunkSectionByIndex(index - 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == 0 && x == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index - 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == LENGTH - 1 && x == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index - 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                }
+                if (y == LENGTH - 1) {
+                    c = chunk.getChunkSectionByIndex(index + 1)
+                    c?.updateMesh = true
+                    c?.sunlightDataCalculated = false
+
+                    if (z == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index + 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (x == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y)
+                            ?.getChunkSectionByIndex(index + 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index + 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (x == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y)
+                            ?.getChunkSectionByIndex(index + 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == 0 && x == 0) {
+                        c = chunk.world.getChunk(chunk.coords.x - 1, chunk.coords.y - 1)
+                            ?.getChunkSectionByIndex(index + 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                    if (z == LENGTH - 1 && x == LENGTH - 1) {
+                        c = chunk.world.getChunk(chunk.coords.x + 1, chunk.coords.y + 1)
+                            ?.getChunkSectionByIndex(index + 1)
+                        c?.updateMesh = true
+                        c?.sunlightDataCalculated = false
+                    }
+                }
             }
         }
 
@@ -204,6 +362,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
     }
 
     var meshExists: Boolean = false
+    var meshRendered: Boolean = false
     var vao: Int = 0
     var vaoSize: Int = 0
     var vbo: Int = 0
@@ -233,6 +392,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                 glDeleteVertexArrays(vao)
             }
             meshExists = false
+            meshRendered = true
             verticesReadyForUpload = false
             timeMeshCreated = glfwGetTime()
             vao = 0
@@ -272,12 +432,12 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         if (newVertexCount > vaoSize) {
             // Reallocate if new data won't fit
             synchronized(verticesForUpload) {
-                glBufferData(GL_ARRAY_BUFFER, verticesForUpload!!.toFloatArray(), GL_DYNAMIC_DRAW)
+                glBufferData(GL_ARRAY_BUFFER, verticesForUpload.toFloatArray(), GL_DYNAMIC_DRAW)
             }
         } else {
             // Just update existing buffer
-            synchronized(verticesForUpload!!) {
-                glBufferSubData(GL_ARRAY_BUFFER, 0, verticesForUpload!!.toFloatArray())
+            synchronized(verticesForUpload) {
+                glBufferSubData(GL_ARRAY_BUFFER, 0, verticesForUpload.toFloatArray())
             }
         }
         glBindBuffer(GL_ARRAY_BUFFER, 0)
@@ -285,6 +445,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         vaoSize = newVertexCount
         updateMesh = false
         verticesReadyForUpload = false
+        meshRendered = true
         verticesForUpload.clear()
         timeMeshCreated = glfwGetTime()
     }
@@ -413,6 +574,15 @@ class Chunk(
         }, this, sectionIndex)
     }
 
+
+
+    fun resetSunLighting() {
+        for (section in sections) {
+            section.sunlightDataCalculated = false
+            section.updateMesh = true
+        }
+    }
+
     init {
         blockData = null
     }
@@ -420,7 +590,7 @@ class Chunk(
     var loaded = true
     var verticalSunCalculated = false
     fun initVerticalSun() {
-        if (!loaded) return
+        if (!loaded || verticalSunCalculated) return
 
         val topY = (numberOfSections - ySectionsOffset) * LENGTH - 1
         val bottomY = peak + 1
@@ -435,6 +605,13 @@ class Chunk(
         }
 
         verticalSunCalculated = true
+
+        for (dx in -1 .. 1) {
+            for (dz in -1 .. 1) {
+                if (dx == 0 && dz == 0) continue
+                world.getChunk(coords.x+dx,coords.y+dz)?.resetSunLighting()
+            }
+        }
     }
 
     fun getChunkSectionByIndex(index: Int): ChunkSection? {
@@ -492,7 +669,16 @@ class Chunk(
         if (!loaded) return false
         var toRender = false
         for (i in 0..<numberOfSections) {
-            if (sections[i].updateMesh) toRender = true
+            if (sections[i].updateMesh && !sections[i].meshRendered) toRender = true
+        }
+        return toRender
+    }
+
+    fun toUpdateMesh(): Boolean {
+        if (!loaded) return false
+        var toRender = false
+        for (i in 0..<numberOfSections) {
+            if (sections[i].updateMesh && sections[i].meshRendered) toRender = true
         }
         return toRender
     }
@@ -501,9 +687,10 @@ class Chunk(
         if (!loaded) return false
         initVerticalSun()
         var hasRendered = false
+        var toCalculateSunLight = true
         for (i in (numberOfSections - 1) downTo 0) {
             if (sections[i].updateMesh) {
-                sections[i].calculateSunLight()
+                if (toCalculateSunLight) toCalculateSunLight = !sections[i].calculateSunLight()
                 sections[i].renderMesh()
                 hasRendered = true
             }

@@ -110,7 +110,7 @@ object Game {
             glFrontFace(GL_CCW)          // counter-clockwise triangles are front-facing
             glDepthFunc(GL_LESS)
 
-            textureId = loadTexture("/assets/Blocktopia/textures/block/cobblestone.png")
+            textureId = loadTexture("/assets/Blocktopia/textures/block/diamond_ore.png")
 
             // Simple shaders
             val vertexShaderSrc = loadResource("/assets/Blocktopia/shaders/core/terrain.vsh")
