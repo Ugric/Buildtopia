@@ -2,7 +2,6 @@ package dev.wbell.buildtopia.app.game.session.world.chunk
 
 import dev.wbell.buildtopia.app.game.Game
 import dev.wbell.buildtopia.app.game.session.world.World
-import dev.wbell.buildtopia.app.game.session.world.chunk.Block.Block
 import dev.wbell.buildtopia.app.game.session.world.chunk.Block.addFace
 import dev.wbell.buildtopia.app.game.session.world.chunk.ChunkSection.Companion.LENGTH
 import dev.wbell.buildtopia.app.game.session.world.floorDiv
@@ -24,8 +23,8 @@ import java.util.Collections
 
 
 interface BlockAccessor {
-    operator fun get(x: Int, y: Int, z: Int): Block?
-    operator fun set(x: Int, y: Int, z: Int, value: Block?)
+    operator fun get(x: Int, y: Int, z: Int): Int
+    operator fun set(x: Int, y: Int, z: Int, value: Int)
 }
 
 interface LightAccessor {
@@ -33,7 +32,7 @@ interface LightAccessor {
     operator fun set(x: Int, y: Int, z: Int, value: Int)
 }
 
-class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: Int) {
+class ChunkSection(val blockData: Array<Int>, val chunk: Chunk, val index: Int) {
     companion object {
         const val LENGTH = 16
         const val SIZE = LENGTH * LENGTH * LENGTH
@@ -58,7 +57,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         )
 
         // Seed the queue with all blocks that have sunlight > 1
-        var blocked = Array(LENGTH*LENGTH){1}
+        val blocked = Array(LENGTH*LENGTH){1}
         var toBreak = false
         for (y in LENGTH - 1 downTo 0) {
             val worldY = y + index * LENGTH - chunk.ySectionsOffset * LENGTH
@@ -69,7 +68,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                     val worldX = x + chunk.coords.x * LENGTH
                     val worldZ = z + chunk.coords.y * LENGTH
                     val light = sunLights[x, y, z]
-                    if (blocks[x,y,z] != null) {
+                    if (blocks[x,y,z] != 0) {
                         blocked[posInBlocked] = 0
                         if (blocked.sum()==0) {
                             toBreak = true
@@ -102,7 +101,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
                 if (newLightLevel <= 0) continue
 
                 // skip if block is solid or light is already >= newLightLevel
-                if (chunk.world.blocks[nx, ny, nz] != null) continue
+                if (chunk.world.blocks[nx, ny, nz] != 0) continue
                 if (chunk.world.sunLights[nx, ny, nz] >= newLightLevel) continue
 
                 // update light immediately and enqueue
@@ -339,13 +338,13 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
     }
 
     val blocks = object : BlockAccessor {
-        override operator fun get(x: Int, y: Int, z: Int): Block? {
+        override operator fun get(x: Int, y: Int, z: Int): Int {
             val index = x + z * LENGTH + y * LENGTH * LENGTH
-            if ((x !in 0..<LENGTH) || (z !in 0..<LENGTH) || (y !in 0..<LENGTH)) return null
+            if ((x !in 0..<LENGTH) || (z !in 0..<LENGTH) || (y !in 0..<LENGTH)) return 0
             return blockData[index]
         }
 
-        override operator fun set(x: Int, y: Int, z: Int, value: Block?) {
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
             val index = x + z * LENGTH + y * LENGTH * LENGTH
             if (index < 0 || index >= blockData.size) return
             blockData[index] = value
@@ -455,7 +454,7 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
         val vertexCount = vaoSize / 7  // <-- changed
 
         // Bind texture
-        glBindTexture(GL_TEXTURE_2D, Game.textureId)
+        glBindTexture(GL_TEXTURE_2D, Game.block_atlas.textureId)
         glUniform1i(glGetUniformLocation(Game.shaderProgram, "texture1"), 0)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
@@ -485,59 +484,65 @@ class ChunkSection(val blockData: Array<Block?>, val chunk: Chunk, val index: In
             for (sectionY in 0..<LENGTH) {
                 val y = sectionY + LENGTH * index - chunk.ySectionsOffset * LENGTH
                 for (z in 0..<LENGTH) {
-                    if (blocks[x, sectionY, z] == null) continue;
+                    if (blocks[x, sectionY, z] == 0) continue;
                     val worldX = x + chunk.coords.x * LENGTH
                     val worldZ = z + chunk.coords.y * LENGTH
-                    if (chunk.world.blocks[worldX, y + 1, worldZ] == null) addFace(
+                    if (chunk.world.blocks[worldX, y + 1, worldZ] == 0) addFace(
                         vertices,
                         x,
                         y,
                         z,
+                        Game.block_atlas.getUV("crafting_table_top.png"),
                         chunk.coords,
                         1f,
                         "top"
                     )
-                    if (chunk.world.blocks[worldX, y - 1, worldZ] == null) addFace(
+                    if (chunk.world.blocks[worldX, y - 1, worldZ] == 0) addFace(
                         vertices,
                         x,
                         y,
                         z,
+                        Game.block_atlas.getUV("oak_planks.png"),
                         chunk.coords,
                         1f,
                         "bottom"
                     )
-                    if (chunk.world.blocks[worldX + 1, y, worldZ] == null) addFace(
+                    if (chunk.world.blocks[worldX + 1, y, worldZ] == 0) addFace(
                         vertices,
                         x,
                         y,
                         z,
+                        Game.block_atlas.getUV("crafting_table_side.png"),
                         chunk.coords,
                         1f,
                         "right"
                     )
-                    if (chunk.world.blocks[worldX - 1, y, worldZ] == null) addFace(
+                    if (chunk.world.blocks[worldX - 1, y, worldZ] == 0) addFace(
                         vertices,
                         x,
                         y,
                         z,
+                        Game.block_atlas.getUV("crafting_table_side.png"),
                         chunk.coords,
                         1f,
                         "left"
                     )
-                    if (chunk.world.blocks[worldX, y, worldZ + 1] == null) addFace(
+                    if (chunk.world.blocks[worldX, y, worldZ + 1] == 0) addFace(
                         vertices,
                         x,
                         y,
                         z,
+                        Game.block_atlas.getUV("crafting_table_front.png"),
                         chunk.coords,
                         1f,
                         "front"
                     )
-                    if (chunk.world.blocks[worldX, y, worldZ - 1] == null) addFace(
+                    if (chunk.world.blocks[worldX, y, worldZ - 1] == 0) addFace(
                         vertices,
                         x,
                         y,
                         z,
+                        Game.block_atlas.getUV("crafting_table_front.png"),
                         chunk.coords,
                         1f,
                         "back"
@@ -562,7 +567,7 @@ class Chunk(
     val coords: Vector2i,
     val numberOfSections: Int,
     val ySectionsOffset: Int,
-    var blockData: Array<Block?>?,
+    var blockData: Array<Int>?,
     val peak: Int
 ) {
     var sections: Array<ChunkSection> = Array(numberOfSections) { sectionIndex ->
@@ -628,12 +633,12 @@ class Chunk(
     }
 
     val blocks = object : BlockAccessor {
-        override operator fun get(x: Int, y: Int, z: Int): Block? {
-            if (!loaded) return null
-            return getChunkSection(y)?.blocks[x, floorMod(y, LENGTH), z]
+        override operator fun get(x: Int, y: Int, z: Int): Int {
+            if (!loaded) return 0
+            return getChunkSection(y)?.blocks[x, floorMod(y, LENGTH), z]?:0
         }
 
-        override operator fun set(x: Int, y: Int, z: Int, value: Block?) {
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
             if (!loaded) return
             getChunkSection(y)?.blocks[x, floorMod(y, LENGTH), z] = value
         }

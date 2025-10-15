@@ -1,8 +1,32 @@
 package dev.wbell.buildtopia.app.game.session.world.chunk.Block
 
+import dev.wbell.buildtopia.app.Resource_Pack_Loader.TextureAtlas.TextureAtlas
 import dev.wbell.buildtopia.app.game.Game
 import dev.wbell.buildtopia.app.game.session.world.chunk.ChunkSection
 import org.joml.Vector2i
+
+data class BlockType(
+    val id: String,
+    val name: String,
+    val texture: String,
+    val transparent: Boolean = false,
+    val solid: Boolean = true,
+)
+
+object BlockRegistry {
+    private val blocksById = mutableMapOf<String, BlockType>()
+    private val idByIndex = mutableListOf<String>() // optional compact storage
+
+    fun register( block: BlockType) {
+        if (block.id in blocksById) error("Block ID '${block.id}' already registered!")
+        blocksById[block.id] = block
+        idByIndex.add(block.id)
+    }
+
+    fun get(id: String): BlockType? = blocksById[id]
+    fun getByIndex(index: Int): BlockType? = blocksById[idByIndex.getOrNull(index)]
+    fun getIndex(id: String): Int = idByIndex.indexOf(id)
+}
 
 fun getVertexLight(x: Int, y: Int, z: Int, chunk: Vector2i, offsets: List<Triple<Int, Int, Int>>): Pair<Float, Float> {
     var sunTotal = 0
@@ -25,7 +49,7 @@ fun getVertexLight(x: Int, y: Int, z: Int, chunk: Vector2i, offsets: List<Triple
 }
 
 // @formatter:off
-fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, chunk: Vector2i, cubeScale: Float, face: String) {
+fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, uv: TextureAtlas.UV, chunk: Vector2i, cubeScale: Float, face: String) {
     val half = cubeScale / 2f
 
     val lightR = 0f
@@ -51,13 +75,13 @@ fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, chunk: Vector2
             val (trR, trG) = getVertexLight(x, y, z, chunk, frontTopRight)
             val (tlR, tlG) = getVertexLight(x, y, z, chunk, frontTopLeft)
             vertices.addAll(listOf(
-            x - half, y - half, z + half, 0f, 1f, blR, blG,   // bottom-left
-            x + half, y - half, z + half, 1f, 1f, brR, brG,   // bottom-right
-            x + half, y + half, z + half, 1f, 0f, trR, trG,   // top-right
+            x - half, y - half, z + half, uv.topLeft.x, uv.bottomRight.y, blR, blG,   // bottom-left
+            x + half, y - half, z + half, uv.bottomRight.x, uv.bottomRight.y, brR, brG,   // bottom-right
+            x + half, y + half, z + half, uv.bottomRight.x, uv.topLeft.y, trR, trG,   // top-right
 
-            x + half, y + half, z + half, 1f, 0f, trR, trG,
-            x - half, y + half, z + half, 0f, 0f, tlR, tlG,   // top-left
-            x - half, y - half, z + half, 0f, 1f, blR, blG,
+            x + half, y + half, z + half, uv.bottomRight.x, uv.topLeft.y, trR, trG,
+            x - half, y + half, z + half, uv.topLeft.x, uv.topLeft.y, tlR, tlG,   // top-left
+            x - half, y - half, z + half, uv.topLeft.x, uv.bottomRight.y, blR, blG,
         ))}
         // === BACK FACE ===
         "back" -> {
@@ -80,13 +104,13 @@ fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, chunk: Vector2
             val (brR, brG) = getVertexLight(x, y, z, chunk, backBottomRight)
 
             vertices.addAll(listOf(
-                x - half, y - half, z - half, 1f, 1f, blR, blG,
-                x - half, y + half, z - half, 1f, 0f, tlR, tlG,
-                x + half, y + half, z - half, 0f, 0f, trR, trG,
+                x - half, y - half, z - half, uv.bottomRight.x, uv.bottomRight.y, blR, blG,
+                x - half, y + half, z - half, uv.bottomRight.x, uv.topLeft.y, tlR, tlG,
+                x + half, y + half, z - half, uv.topLeft.x, uv.topLeft.y, trR, trG,
 
-                x + half, y + half, z - half, 0f, 0f, trR, trG,
-                x + half, y - half, z - half, 0f, 1f, brR, brG,
-                x - half, y - half, z - half, 1f, 1f, blR, blG,
+                x + half, y + half, z - half, uv.topLeft.x, uv.topLeft.y, trR, trG,
+                x + half, y - half, z - half, uv.topLeft.x, uv.bottomRight.y, brR, brG,
+                x - half, y - half, z - half, uv.bottomRight.x, uv.bottomRight.y, blR, blG,
             ))
         }
 
@@ -111,13 +135,13 @@ fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, chunk: Vector2
             val (tbR, tbG) = getVertexLight(x, y, z, chunk, leftTopBack)
 
             vertices.addAll(listOf(
-                x - half, y - half, z - half, 0f, 1f, bbR, bbG,
-                x - half, y - half, z + half, 1f, 1f, bfR, bfG,
-                x - half, y + half, z + half, 1f, 0f, tfR, tfG,
+                x - half, y - half, z - half, uv.topLeft.x, uv.bottomRight.y, bbR, bbG,
+                x - half, y - half, z + half, uv.bottomRight.x, uv.bottomRight.y, bfR, bfG,
+                x - half, y + half, z + half, uv.bottomRight.x, uv.topLeft.y, tfR, tfG,
 
-                x - half, y + half, z + half, 1f, 0f, tfR, tfG,
-                x - half, y + half, z - half, 0f, 0f, tbR, tbG,
-                x - half, y - half, z - half, 0f, 1f, bbR, bbG,
+                x - half, y + half, z + half, uv.bottomRight.x, uv.topLeft.y, tfR, tfG,
+                x - half, y + half, z - half, uv.topLeft.x, uv.topLeft.y, tbR, tbG,
+                x - half, y - half, z - half, uv.topLeft.x, uv.bottomRight.y, bbR, bbG,
             ))
         }
 
@@ -142,13 +166,13 @@ fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, chunk: Vector2
             val (tbR, tbG) = getVertexLight(x, y, z, chunk, rightTopBack)
 
             vertices.addAll(listOf(
-                x + half, y - half, z - half, 1f, 1f, bbR, bbG,
-                x + half, y + half, z + half, 0f, 0f, tfR, tfG,
-                x + half, y - half, z + half, 0f, 1f, bfR, bfG,
+                x + half, y - half, z - half, uv.bottomRight.x, uv.bottomRight.y, bbR, bbG,
+                x + half, y + half, z + half, uv.topLeft.x, uv.topLeft.y, tfR, tfG,
+                x + half, y - half, z + half, uv.topLeft.x, uv.bottomRight.y, bfR, bfG,
 
-                x + half, y + half, z + half, 0f, 0f, tfR, tfG,
-                x + half, y - half, z - half, 1f, 1f, bbR, bbG,
-                x + half, y + half, z - half, 1f, 0f, tbR, tbG,
+                x + half, y + half, z + half, uv.topLeft.x, uv.topLeft.y, tfR, tfG,
+                x + half, y - half, z - half, uv.bottomRight.x, uv.bottomRight.y, bbR, bbG,
+                x + half, y + half, z - half, uv.bottomRight.x, uv.topLeft.y, tbR, tbG,
             ))
         }
 
@@ -173,13 +197,13 @@ fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, chunk: Vector2
             val (brR, brG) = getVertexLight(x, y, z, chunk, topBackRight)
 
             vertices.addAll(listOf(
-                x - half, y + half, z - half, 0f, 0f, blR, blG,
-                x - half, y + half, z + half, 0f, 1f, flR, flG,
-                x + half, y + half, z + half, 1f, 1f, frR, frG,
+                x - half, y + half, z - half, uv.topLeft.x, uv.topLeft.y, blR, blG,
+                x - half, y + half, z + half, uv.topLeft.x, uv.bottomRight.y, flR, flG,
+                x + half, y + half, z + half, uv.bottomRight.x, uv.bottomRight.y, frR, frG,
 
-                x + half, y + half, z + half, 1f, 1f, frR, frG,
-                x + half, y + half, z - half, 1f, 0f, brR, brG,
-                x - half, y + half, z - half, 0f, 0f, blR, blG,
+                x + half, y + half, z + half, uv.bottomRight.x, uv.bottomRight.y, frR, frG,
+                x + half, y + half, z - half, uv.bottomRight.x, uv.topLeft.y, brR, brG,
+                x - half, y + half, z - half, uv.topLeft.x, uv.topLeft.y, blR, blG,
             ))
         }
 
@@ -204,19 +228,15 @@ fun addFace(vertices: MutableList<Float>, x: Int, y: Int, z: Int, chunk: Vector2
             val (brR, brG) = getVertexLight(x, y, z, chunk, bottomBackRight)
 
             vertices.addAll(listOf(
-                x - half, y - half, z - half, 1f, 0f, blR, blG,
-                x + half, y - half, z + half, 0f, 1f, frR, frG,
-                x - half, y - half, z + half, 1f, 1f, flR, flG,
+                x - half, y - half, z - half, uv.bottomRight.x, uv.topLeft.y, blR, blG,
+                x + half, y - half, z + half, uv.topLeft.x, uv.bottomRight.y, frR, frG,
+                x - half, y - half, z + half, uv.bottomRight.x, uv.bottomRight.y, flR, flG,
 
-                x - half, y - half, z - half, 1f, 0f, blR, blG,
-                x + half, y - half, z - half, 0f, 0f, brR, brG,
-                x + half, y - half, z + half, 0f, 1f, frR, frG,
+                x - half, y - half, z - half, uv.bottomRight.x, uv.topLeft.y, blR, blG,
+                x + half, y - half, z - half, uv.topLeft.x, uv.topLeft.y, brR, brG,
+                x + half, y - half, z + half, uv.topLeft.x, uv.bottomRight.y, frR, frG,
             ))
         }
     }
 }
 // @formatter:on
-
-
-class Block {
-}

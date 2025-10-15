@@ -32,5 +32,6 @@ void main() {
     vec3 factor = clamp(0.5 - light, 0.0, 1.0); // only affects darker areas
     light = light + shadowLift * factor;
 
-    FragColor = vec4(texColor.rgb * light, 1.0);
+    // Apply lighting to RGB but preserve alpha from texture
+    FragColor = vec4(texColor.rgb * light, texColor.a);
 }

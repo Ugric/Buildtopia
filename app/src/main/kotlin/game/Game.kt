@@ -1,13 +1,16 @@
 package dev.wbell.buildtopia.app.game
 
+import dev.wbell.buildtopia.app.Resource_Pack_Loader.TextureAtlas.ClasspathResourceProvider.ClasspathResourceProvider
+import dev.wbell.buildtopia.app.Resource_Pack_Loader.TextureAtlas.TextureAtlas
 import dev.wbell.buildtopia.app.createShader
 import dev.wbell.buildtopia.app.game.session.Session
 import dev.wbell.buildtopia.app.game.session.world.World
+import dev.wbell.buildtopia.app.game.session.world.chunk.Block.BlockRegistry
+import dev.wbell.buildtopia.app.game.session.world.chunk.Block.BlockType
 import dev.wbell.buildtopia.app.game.session.world.player.Player
 import dev.wbell.buildtopia.app.loadResource
 import org.joml.Matrix4f
 import org.joml.Vector3d
-import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL20.glGetUniformLocation
@@ -15,45 +18,7 @@ import org.lwjgl.opengl.GL20.glUseProgram
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL20.glUniformMatrix4fv
-import org.lwjgl.stb.STBImage
-import java.nio.IntBuffer
 import kotlin.math.PI
-
-
-fun loadTexture(path: String): Int {
-    val textureId = glGenTextures()
-    glBindTexture(GL_TEXTURE_2D, textureId)
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-
-
-    // Load image from resources
-    val stream = object {}.javaClass.getResourceAsStream(path)
-        ?: throw RuntimeException("Failed to load texture: $path")
-
-    // Read stream into a ByteBuffer
-    val bytes = stream.readBytes()
-    val buffer = BufferUtils.createByteBuffer(bytes.size)
-    buffer.put(bytes)
-    buffer.flip()
-
-    val widthBuffer: IntBuffer = BufferUtils.createIntBuffer(1)
-    val heightBuffer: IntBuffer = BufferUtils.createIntBuffer(1)
-    val channelsBuffer: IntBuffer = BufferUtils.createIntBuffer(1)
-
-    val image = STBImage.stbi_load_from_memory(buffer, widthBuffer, heightBuffer, channelsBuffer, 4)
-        ?: throw RuntimeException("Failed to load texture: ${STBImage.stbi_failure_reason()}")
-
-    val width = widthBuffer.get(0)
-    val height = heightBuffer.get(0)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image)
-    STBImage.stbi_image_free(image)
-
-    return textureId
-}
 
 object Game {
     val session = Session()
@@ -67,7 +32,7 @@ object Game {
         var lastY: Double? = null
     }
 
-    var textureId = 0
+    val block_atlas = TextureAtlas(ClasspathResourceProvider("/assets/Blocktopia/textures/block", this))
 
     var shaderProgram = 0
     var modelLoc = 0
@@ -91,7 +56,12 @@ object Game {
     }
 
     fun init() {
-        // Initialize GLFW
+        // Initialize GLF
+        BlockRegistry.register(BlockType("minecraft:air", "Air", "", transparent = true, solid = false))
+        println(BlockRegistry.getIndex("minecraft:air"))
+        BlockRegistry.register(BlockType("minecraft:stone", "Stone", "block/stone.png"))
+        BlockRegistry.register(BlockType("minecraft:dirt", "Dirt", "block/dirt.png", transparent = true))
+        BlockRegistry.register(BlockType("minecraft:glass_block", "Glass Block", "block/grass_block.png", transparent = true))
         if (!glfwInit()) throw RuntimeException("Failed to initialize GLFW")
         glfwWindowHint(GLFW_SAMPLES, 4)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
@@ -109,8 +79,13 @@ object Game {
             glCullFace(GL_BACK)          // cull back faces
             glFrontFace(GL_CCW)          // counter-clockwise triangles are front-facing
             glDepthFunc(GL_LESS)
+            glEnable(GL_BLEND)
+            glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-            textureId = loadTexture("/assets/Blocktopia/textures/block/diamond_ore.png")
+            block_atlas.buildAtlas()
 
             // Simple shaders
             val vertexShaderSrc = loadResource("/assets/Blocktopia/shaders/core/terrain.vsh")
@@ -123,7 +98,7 @@ object Game {
             modelLoc = glGetUniformLocation(shaderProgram, "model")
             viewLoc = glGetUniformLocation(shaderProgram, "view")
             projLoc = glGetUniformLocation(shaderProgram, "projection")
-            session.World = World(Player(Vector3d(0.0, 400.0, 0.0), 0f, 0f), session)
+            session.World = World(Player(Vector3d(0.0, 500.0, 0.0), 0f, 0f), session)
             session.World!!.player.world = session.World
             session.World!!.init()
 

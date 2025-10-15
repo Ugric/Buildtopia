@@ -4,7 +4,7 @@ import OpenSimplex2S.OpenSimplex2S
 import dev.wbell.buildtopia.app.game.Game
 import dev.wbell.buildtopia.app.game.camera.Camera
 import dev.wbell.buildtopia.app.game.session.Session
-import dev.wbell.buildtopia.app.game.session.world.chunk.Block.Block
+import dev.wbell.buildtopia.app.game.session.world.chunk.Block.BlockRegistry
 import dev.wbell.buildtopia.app.game.session.world.chunk.BlockAccessor
 import dev.wbell.buildtopia.app.game.session.world.chunk.Chunk
 import dev.wbell.buildtopia.app.game.session.world.chunk.ChunkSection
@@ -16,13 +16,35 @@ import kotlinx.coroutines.*
 import org.joml.Matrix4f
 import org.joml.Vector2i
 import org.joml.Vector3d
-import org.lwjgl.glfw.GLFW.*
+import org.lwjgl.glfw.GLFW.glfwGetTime
 import org.lwjgl.opengl.GL20.*
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.PriorityBlockingQueue
 import kotlin.math.PI
+
+
+//fun main() {
+//    val worldSeed: Long = 1L
+//    val version = MCVersion.v1_16_5
+//    val dimension = Dimension.OVERWORLD
+//
+//    val biomeSource = BiomeSource.of(dimension, version, worldSeed)
+//    val terrainGenerator = TerrainGenerator.of(biomeSource)
+//        ?: throw IllegalStateException("Failed to create TerrainGenerator")
+//
+//    val block: Optional<McBlock?>? = terrainGenerator.getBlockAt(0, 0, 0)
+//    val column = terrainGenerator.getColumnAt(0, 0)
+//
+//    val surfaceGenHeight: Int = terrainGenerator.getFirstHeightInColumn(0, 0, TerrainGenerator.WORLD_SURFACE_WG)
+//    val oceanGenHeight: Int = terrainGenerator.getFirstHeightInColumn(0, 0, TerrainGenerator.OCEAN_FLOOR_WG)
+//    val surfaceBlockIn: Int = terrainGenerator.getHeightInGround(0, 0)
+//    val surfaceBlockAbove: Int = terrainGenerator.getHeightOnGround(0, 0)
+//
+//    println("Block at (0,0,0): $block")
+//    println("Surface height: $surfaceGenHeight")
+//    println("Ocean floor height: $oceanGenHeight")
+//}
 
 fun floorDiv(a: Int, b: Int): Int {
     // rounds down (towards -∞), unlike / which rounds toward 0
@@ -50,11 +72,13 @@ class World(val player: Player, val session: Session) {
     private var isActive = true
     var lastTick = glfwGetTime()
     var dayNightLoc = glGetUniformLocation(Game.shaderProgram, "dayNight")
-    var dayNightTick = 0
+    var dayNightTick = 12000
 
-    var seed: Long = 12345
+    val seed: Long = 1203223
+
 
     fun init() {
+
         startPhysics()
         startChunkRenderer()
         startChunkUpdateRenderer()
@@ -94,55 +118,56 @@ class World(val player: Player, val session: Session) {
                 chunksToRender.sortBy { (_, coords) -> (coords.x - centerChunk.x) * (coords.x - centerChunk.x) + (coords.y - centerChunk.y) * (coords.y - centerChunk.y) }
                 var i = 0
                 for ((key, coords) in chunksToRender) {
-                    var peak = -4* ChunkSection.SIZE
+                    var peak = -4 * ChunkSection.SIZE
                     val blockData = Array(ChunkSection.LENGTH * ChunkSection.LENGTH * ChunkSection.LENGTH * 24) { i ->
                         val x = i % ChunkSection.LENGTH
                         val z = (i / ChunkSection.LENGTH) % ChunkSection.LENGTH
-                        val y = (i / (ChunkSection.LENGTH * ChunkSection.LENGTH)) - 4 * ChunkSection.LENGTH
+                        val y = (i / (ChunkSection.LENGTH * ChunkSection.LENGTH)) - 0 * ChunkSection.LENGTH
 
-                        // world-space coordinates
+
+                        // World coordinates
                         val worldX = coords.x * ChunkSection.LENGTH + x
                         val worldZ = coords.y * ChunkSection.LENGTH + z
                         val worldY = y
 
-                        // --- Biome / height noise ---
-                        val biomeFactor = OpenSimplex2S.noise2(seed + 1000, worldX * 0.01, worldZ * 0.01)
-                        val baseHeight = 64 + (biomeFactor * 8).toInt() // plains ~56-72
+                        // ----- TERRAIN HEIGHT -----
+                        val cont = OpenSimplex2S.noise2(seed + 1000, worldX * 0.0008, worldZ * 0.0008) // continents/ocean
+                        val ridge = OpenSimplex2S.noise2(seed + 2000, worldX * 0.004, worldZ * 0.004) // mountains
+                        val detail = OpenSimplex2S.noise2(seed + 3000, worldX * 0.02, worldZ * 0.02) // small variation
 
-                        // Hills / mountains
-                        val hillNoise = OpenSimplex2S.noise2(seed + 2000, worldX * 0.02, worldZ * 0.02)
-                        val hillHeight = (hillNoise * 16).toInt()
-                        val terrainHeight = baseHeight + hillHeight
+                        // Blend noises together
+                        val baseHeight = 64.0 + cont * 30.0
+                        val ridgeHeight = ridge * ridge * 50.0 // squared for more contrast
+                        val terrainHeight = (baseHeight + ridgeHeight + detail * 3.0).toInt()
 
-                        // --- Multi-octave 3D caves ---
+                        // ----- CAVES -----
                         fun caveDensity(x: Double, y: Double, z: Double): Double {
-                            var density = 0.0
-                            var frequency = 0.02
-                            var amplitude = 1.0
-                            for (octave in 0 until 3) { // 3 octaves, can increase for more detail
-                                density += OpenSimplex2S.noise3_ImproveXY(seed + 3000 + octave * 1000, x * frequency, y * frequency, z * frequency) * amplitude
-                                frequency *= 2.0
-                                amplitude /= 2.0
+                            var total = 0.0
+                            var freq = 0.01
+                            var amp = 1.0
+                            for (octave in 0 until 4) {
+                                total += OpenSimplex2S.noise3_ImproveXY(seed + 4000 + octave * 500, x * freq, y * freq, z * freq) * amp
+                                freq *= 2.0
+                                amp *= 0.5
                             }
-                            return density
+                            return total
                         }
 
                         val density = caveDensity(worldX.toDouble(), worldY.toDouble(), worldZ.toDouble())
 
-                        // Optional: reduce cave openings near surface
-                        val heightFactor = ((terrainHeight - worldY).toDouble() / 30.0).coerceIn(0.0, 1.0)
-                        val isCave = density > 0.5 * heightFactor // adjust threshold for more/less caves
+                        // Caves taper out near the surface
+                        val heightFactor = ((terrainHeight - worldY).toDouble() / 40.0).coerceIn(0.0, 1.0)
+                        val isCave = density > 0.6 * heightFactor
 
-                        // --- Set block ---
-                        val block: Block? = if (worldY <= terrainHeight && !isCave) {
+                        // ----- BLOCK PLACEMENT -----
+                        val block: Int = if (worldY <= terrainHeight && !isCave) {
                             when {
-                                worldY == terrainHeight -> Block()
-                                worldY >= terrainHeight - 3 -> Block()
-                                else -> Block()
+                                worldY == terrainHeight -> BlockRegistry.getIndex("minecraft:grass_block")
+                                worldY >= terrainHeight - 4 -> BlockRegistry.getIndex("minecraft:dirt")
+                                else -> BlockRegistry.getIndex("minecraft:stone")
                             }
-                        } else null
-
-                        if (terrainHeight > peak) peak = terrainHeight
+                        } else BlockRegistry.getIndex("minecraft:air")
+                        if (block != 0 && y > peak) peak = y
                         block
                     }
                     chunks[key] = Chunk(
@@ -168,7 +193,7 @@ class World(val player: Player, val session: Session) {
                 for (chunk in chunks.values) {
                     if (chunk.toRenderMesh()) markChunkDirty(chunk)
                 }
-                repeat(4) {
+                repeat(10) {
                     val next = chunkRenderQueue.poll() ?: return@repeat
                     val (chunk, _) = next
                     chunk.isQueuedForRender = false
@@ -190,7 +215,7 @@ class World(val player: Player, val session: Session) {
                 for (chunk in chunks.values) {
                     if (chunk.toUpdateMesh()) markChunkDirtyUpdate(chunk)
                 }
-                repeat(4) {
+                repeat(10) {
                     val next = chunkUpdateRenderQueue.poll() ?: return@repeat
                     val (chunk, _) = next
                     chunk.isQueuedForRender = false
@@ -233,14 +258,14 @@ class World(val player: Player, val session: Session) {
 
 
     val blocks = object : BlockAccessor {
-        override operator fun get(x: Int, y: Int, z: Int): Block? {
+        override operator fun get(x: Int, y: Int, z: Int): Int {
             return getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.blocks[floorMod(
                 x,
                 ChunkSection.LENGTH
-            ), y, floorMod(z, ChunkSection.LENGTH)]
+            ), y, floorMod(z, ChunkSection.LENGTH)]?:0
         }
 
-        override operator fun set(x: Int, y: Int, z: Int, value: Block?) {
+        override operator fun set(x: Int, y: Int, z: Int, value: Int) {
             getChunk(floorDiv(x, ChunkSection.LENGTH), floorDiv(z, ChunkSection.LENGTH))?.blocks[floorMod(
                 x,
                 ChunkSection.LENGTH
@@ -314,7 +339,7 @@ class World(val player: Player, val session: Session) {
             (player.position.x / ChunkSection.LENGTH).toInt(),
             (player.position.z / ChunkSection.LENGTH).toInt()
         )
-        val renderDistance = Settings.get(SettingKey.RENDERDISTANCE) ?: 32
+        val renderDistance = Settings[SettingKey.RENDERDISTANCE] ?: 32
 
 // --- Unload distant chunks ---
         val chunksToUnload = chunks.values.filter { chunk ->
@@ -333,7 +358,7 @@ class World(val player: Player, val session: Session) {
         val chunkCoords = mutableListOf<Pair<Long, Vector2i>>()
         for (dx in -renderDistance..renderDistance) {
             for (dz in -renderDistance..renderDistance) {
-                if (dx*dx + dz*dz > renderDistance*renderDistance) continue // circular radius
+                if (dx * dx + dz * dz > renderDistance * renderDistance) continue // circular radius
                 val chunkX = centerChunk.x + dx
                 val chunkZ = centerChunk.y + dz
                 val key = packChunkKey(chunkX, chunkZ)
@@ -345,7 +370,7 @@ class World(val player: Player, val session: Session) {
         chunkCoords.sortBy { (_, coords) ->
             val dx = coords.x - centerChunk.x
             val dz = coords.y - centerChunk.y
-            dx*dx + dz*dz
+            dx * dx + dz * dz
         }
 
 // --- Load/render chunks in order ---

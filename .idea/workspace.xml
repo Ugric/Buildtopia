@@ -4,14 +4,27 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="add resource pack">
+    <list default="true" id="3ee4ea58-b8cf-44ca-b7e6-78580145f11f" name="Changes" comment="change renderer to be split up into renderering new chunks and re rendering old ones for speed">
+      <change afterPath="$PROJECT_DIR$/app/src/main/kotlin/Resource_Pack_Loader/TextureAtlas/ClasspathResourceProvider/ClasspathResourceProvider.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/kotlin/Resource_Pack_Loader/TextureAtlas/FileSystemProvider/FileResourceProvider.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/kotlin/Resource_Pack_Loader/TextureAtlas/TextureAtlas.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/Server/InternalServer.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/Server/Server.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/App.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/App.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/Game.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/Game.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/World.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Block/Block.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Block/Block.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/chunk/Chunk.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/player/Player.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/kotlin/game/session/world/player/Player.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/resources/assets/Blocktopia/shaders/core/terrain.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/resources/assets/Blocktopia/shaders/core/terrain.fsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/mc_terrain_java/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/lib/mc_terrain_java/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/mc_terrain_java/src/main/java/com/seedfinding/mcterrain/terrain/SurfaceGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/lib/mc_terrain_java/src/main/java/com/seedfinding/mcterrain/terrain/SurfaceGenerator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,8 +43,14 @@
           <activation />
         </task>
         <projects_view>
+          <option name="groupModules" value="false" />
           <tree_state>
-            <expand />
+            <expand>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="Buildtopia" type="f1a62948:ProjectNode" />
+              </path>
+            </expand>
             <select />
           </tree_state>
         </projects_view>
@@ -42,6 +61,8 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Class" />
+        <option value="Kotlin Interface" />
+        <option value="Kotlin Class" />
       </list>
     </option>
   </component>
@@ -81,7 +102,8 @@
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/william/Documents/GitHub/mc_terrain_java&quot;
   }
 }</component>
   <component name="RecentsManager">
@@ -167,7 +189,15 @@
       <option name="project" value="LOCAL" />
       <updated>1759638464558</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="change renderer to be split up into renderering new chunks and re rendering old ones for speed">
+      <option name="closed" value="true" />
+      <created>1759731329848</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1759731329848</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -175,6 +205,7 @@
     <MESSAGE value="add render for the specific session instead of directly calling world" />
     <MESSAGE value="add noise based terrain, with caves, and better mesh render times." />
     <MESSAGE value="add resource pack" />
-    <option name="LAST_COMMIT_MESSAGE" value="add resource pack" />
+    <MESSAGE value="change renderer to be split up into renderering new chunks and re rendering old ones for speed" />
+    <option name="LAST_COMMIT_MESSAGE" value="change renderer to be split up into renderering new chunks and re rendering old ones for speed" />
   </component>
 </project>

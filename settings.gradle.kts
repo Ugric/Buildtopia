@@ -22,5 +22,7 @@ plugins {
 // Learn more about structuring projects with Gradle - https://docs.gradle.org/8.7/userguide/multi_project_builds.html
 include(":app")
 include(":utils")
+include("mc_terrain_java")
+project(":mc_terrain_java").projectDir = file("lib/mc_terrain_java")
 
 rootProject.name = "Buildtopia"

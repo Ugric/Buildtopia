@@ -62,7 +62,7 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
             for (y in minY..maxY) {
                 for (z in minZ..maxZ) {
                     val block = world!!.blocks[x, y, z]
-                    if (block != null) {
+                    if (block != 0) {
                         boxes.add(
                             AABB(
                                 x - 0.5, y.toDouble(), z - 0.5,
@@ -183,7 +183,12 @@ class Player(val position: Vector3d, var pitch: Float, var yaw: Float) {
     }
 
     fun getCamera(alpha: Double): Camera {
-        val targetFovModifier = if (isSprinting) 1.1 else 1.0
+        var targetFovModifier = if (isSprinting) 1.1 else 1.0
+
+
+        if (glfwGetKey(Game.window!!, GLFW_KEY_C) == GLFW_PRESS) {
+            targetFovModifier = 0.2
+        }
 
         // gradually move current toward target, just like Minecraft
         fovModifierCurrent += (targetFovModifier - fovModifierCurrent) * 0.1

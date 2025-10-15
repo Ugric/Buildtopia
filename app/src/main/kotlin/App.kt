@@ -1,9 +1,7 @@
 package dev.wbell.buildtopia.app
 
 import dev.wbell.buildtopia.app.game.Game
-import org.joml.Matrix4f
 import org.lwjgl.glfw.GLFW.*
-import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL20.*
 
 fun loadResource(path: String): String {
@@ -35,7 +33,7 @@ fun main() {
 
 
     // Camera parameters
-    var startTime = glfwGetTime()
+    val startTime = glfwGetTime()
     var lastTime = startTime
 //
 //

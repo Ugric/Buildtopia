@@ -9,6 +9,11 @@ plugins {
 }
 val lwjglVersion = "3.3.6"
 
+repositories {
+    mavenCentral()
+    maven(url = "https://maven.seedfinding.com") // ✅ use url= keyword
+}
+
 dependencies {
     implementation(project(":utils"))
 
@@ -21,6 +26,13 @@ dependencies {
     implementation("org.lwjgl:lwjgl-opengl:$lwjglVersion")
     implementation("org.lwjgl:lwjgl-glfw:$lwjglVersion")
     implementation("org.lwjgl:lwjgl-stb:$lwjglVersion")
+
+    implementation(project(":mc_terrain_java"))
+    implementation("com.seedfinding:mc_math:1.171.0")
+    implementation("com.seedfinding:mc_seed:1.171.1")
+    implementation("com.seedfinding:mc_core:1.192.1")
+    implementation("com.seedfinding:mc_noise:1.171.1")
+    implementation("com.seedfinding:mc_biome:1.171.1")
 
     // Natives for all platforms
     runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:natives-linux")
